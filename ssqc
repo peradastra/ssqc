@@ -21,21 +21,7 @@ while read -r val;do
 			exit 1
 		fi
 	fi
-        if [[ "$val" =~ ref ]];then
-                ref="$(cut -f2 <<< "$val")"
-                if [ ! -f "$ref" ]; then
-                        echo "Pathway to reference genome incorrect"
-                        exit 1
-                fi
-        fi
-        if [[ "$val" =~ is2nt ]];then
-                nt2is="$(cut -f2 <<< "$val")"
-                if [ ! -f "$nt2is" ]; then
-                        echo "Pathway to NT to IS lookup table incorrect"
-                        exit 1
-                fi
-        fi
-	if [[ "$val" =~ is_input ]];then
+        if [[ "$val" =~ is_input ]];then
                 is_input="$(cut -f2 <<< "$val")"
         fi
 	if [[ "$val" =~ cc_expected ]];then
@@ -50,19 +36,18 @@ if [[ ! "$line" =~ ^# ]];then
 	[ ${fp%%*.} == "gz" ] && { fn=${fp%.gz}; fe="gz"; } || { fn=${fp%.fastq.gz}; fe="fastq.gz"; }
 	[ ${fp%%*.} == "fastq" ] && { fn=${fp%.fastq}; fe="fastq"; }
 	[[ $fe != "fastq.gz" && $fe != "fastq" ]] && { echo "Bad file extention for $fp, must be .fastq or .fastq.gz"; exit 1; }	
-        
-	echo "Aligning $fn..."
-	if [ $pe ==1 ];then
-		read -r line2
+	read -r line2
+	if [ pe ==1 ];then
+        echo "Aligning $fn..."
+	read -r line2
  		bwa mem -t 32 $ref $line $line2 | samtools sort -@1G -o "${pi}/${fn}.bam" -  
 	else
 		bwa mem -t 32 $ref $line | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
-	
-	./remRecombo "$nt2is" "${pi}/${fn}.bam"
-#	./remPrimers "/NGS/sanger/REFS/ActicV3-bamClipper.bed" "${pi}/${fn}-good.bam"
-#	./realign.2 "${pi}/${fn}-good.hc.bam"
-#	/NGS/VC "${pi}/${fn}-good.hc.ra.bam"
+	./remRecombo /NGS/sanger/200721/concatIS/NT_IS_LOOKUP_TABLEv2.txt "${pi}/${fn}.bam"
+	./remPrimers "/NGS/sanger/REFS/ActicV3-bamClipper.bed" "${pi}/${fn}-good.bam"
+	./realign.2 "${pi}/${fn}-good.hc.bam"
+	/NGS/VC "${pi}/${fn}-good.hc.ra.bam"
 fi
 
 done < "$input"
