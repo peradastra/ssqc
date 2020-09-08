@@ -5,6 +5,8 @@
 ## fastq-files	</path/to/file> contains a list of fastq.gz files, paired ends alternate with naming convension name-R1.fastq.gz and name-R2.fastq.gz
 ## is_input	<integer> copies of internal standard added to sample.
 ## cc_expected	<integer> determined after several runs..expected count of unique CC sequences when no significant NT competition.
+## nt2is </path/to/file> contains the mapping of NT to IS, base changes in lowercase
+## ref </path/to/files> path to the reference genome
 
 while read -r val;do
 	if [[ "$val" =~ ^paired-end ]];then 
@@ -27,6 +29,21 @@ while read -r val;do
 	if [[ "$val" =~ cc_expected ]];then
 		cc_expected="$(cut -f2 <<< "$val")"
 	fi
+	if [[ "$val" =~ ^nt2is ]];then
+		nt2is="$(cut -f2 <<< "$val")"
+                if [ ! -f "$nt2is" ]; then
+                        echo "Pathway to NT to IS mapping table incorrect"
+                        exit 1
+                fi
+	fi
+        if [[ "$val" =~ ^ref ]];then
+                ref="$(cut -f2 <<< "$val")"
+                if [ ! -f "$ref" ]; then
+                        echo "Pathway to NT to IS mapping table incorrect"
+                        exit 1
+                fi
+        fi
+
 done < "$1"
 
 while read -r line; do
@@ -38,13 +55,13 @@ if [[ ! "$line" =~ ^# ]];then
 	[[ $fe != "fastq.gz" && $fe != "fastq" ]] && { echo "Bad file extention for $fp, must be .fastq or .fastq.gz"; exit 1; }	
 	read -r line2
 	if [ pe ==1 ];then
-        echo "Aligning $fn..."
-	read -r line2
+	        echo "Aligning $fn..."
+		read -r line2
  		bwa mem -t 32 $ref $line $line2 | samtools sort -@1G -o "${pi}/${fn}.bam" -  
 	else
 		bwa mem -t 32 $ref $line | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
-	./remRecombo /NGS/sanger/200721/concatIS/NT_IS_LOOKUP_TABLEv2.txt "${pi}/${fn}.bam"
+	./remRecombo "$nt2is" "${pi}/${fn}.bam"
 	./remPrimers "/NGS/sanger/REFS/ActicV3-bamClipper.bed" "${pi}/${fn}-good.bam"
 	./realign.2 "${pi}/${fn}-good.hc.bam"
 	/NGS/VC "${pi}/${fn}-good.hc.ra.bam"
