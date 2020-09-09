@@ -52,6 +52,10 @@ while read -r val;do
         fi
 
 done < "$1"
+
+pi=$(dirname "$input")
+echo -e "SAMPLE\tPOOL\tCCQC\tLOAD"> "${pi}/runQC.txt"
+
 while read -r line; do
 if [[ ! "$line" =~ ^# ]];then
 echo $line
@@ -71,7 +75,6 @@ echo "Aligning..."
 	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
 	rm -f "${pi}/${fn}.bam"	
 
-	echo -e "SAMPLE\tPOOL\tCCQC\tLOAD"> "${pi}/runQC.txt"
 	awk -v output="${pi}/runQC.txt" -v cc_expected=$cc_expected -v is_input=$is_input '$2==1 {
 	printf "%s\t%s\t%f\t%i\n", $1, "1",($5/($5+$4)*$3)/cc_expected,$4/$5*is_input >> output}
 	$2==2 {printf "%s\t%s\t%f\t%i\n", $1,"2", ($5/($5+$4)*$3)/cc_expected,$4/$5*is_input >> output}
