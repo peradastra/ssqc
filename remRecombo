@@ -1,8 +1,7 @@
 #!/bin/bash -e
 
-##usage: remRecombo <lookupTable> <bam> 
+##usage: remRecombo <lookupTable> <bam> <splitSeq>
 ## For SNAQ analysis requiring reads containing both control and native sequences.
-## ???not true? Sort by QNAME for more accurate CC counting (don't double count R1 and R2)
 ## Create bad and good read file place holders with bam header,
 ## awk Import NT IS lookup table, create recombinant hash table RefName : POS : base, where base is switched between IS and NT
 ##    Use cigar for each read and look at each position to see if found in hash (if yes, it's a recombinate or unfortunate NGS error/mutant,
@@ -10,6 +9,7 @@
 ##    After samtools view input done, each read in tempFile exists in badQname table, if yes move read to bad.sam; else add to good.sam
 ##Complexity Control extraction.  If RefName indicates CC, hard coded position extracted into a file: SampleID PoolID Sequence
 ##	The CC uses the bases flanking the Ns to ensure alignment was correct.
+##splitSeq boolean indicates if the NT and IS should be split
 ##Clean up: covert sam to bam, index, tabulate CC results, remove primer sequences in preparation for VCF.
 ## Version:
 ##	0.1 First release, uses concatenated IS
@@ -28,6 +28,7 @@ if [[ $fe -ne "bam" ]];then
 fi
 complexityFile="${pi}/${fn}-CC.txt"
 goodFile="${pi}/${fn}-good.sam"
+isFile="${pi}/${fn}-IS.sam"
 badFile="${pi}/${fn}-bad.sam"
 ccFile="${pi}/${fn}-cc.sam"
 hashTallies="${pi}/${fn}-tallies.txt"
@@ -37,9 +38,10 @@ echo "Preparing ${pi}/${fn}.${fe}..."
 samtools view -H "${pi}/${fn}.${fe}" > $goodFile
 cp $goodFile $badFile
 cp $goodFile $ccFile
+cp $goodFile $isFile
 
 echo "Removing recombinants & calculating CC..."
-samtools view "${pi}/${fn}.${fe}" | awk -v badFile="$badFile" -v ccFile="$ccFile" -v tempFile="$tempFile" -v goodFile="$goodFile" -v hashTallies="$hashTallies" -v complexityFile="$complexityFile" -v sampleName="$fn" ' 
+samtools view "${pi}/${fn}.${fe}" | awk -v badFile="$badFile" -v ccFile="$ccFile" -v tempFile="$tempFile" -v goodFile="$goodFile" -v hashTallies="$hashTallies" -v complexityFile="$complexityFile" -v sampleName="$fn" -v splitSeq="$3" -v isFile="$isFile" ' 
 BEGIN {
 	xs="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 }
@@ -62,6 +64,13 @@ FILENAME==tempFile{
 		print $0 >> ccFile #this will ensure no CC chimeras end up in good bam
 	} else if($1 in badQname){
 		print $0 >> badFile #this will ensure R2, which could be recombo, does not end up in good bam
+	} else if (splitSeq) {
+		if ($3 ~ "_SNAQ") {
+			print $0 >> isFile
+
+		} else {
+			print $0 >> goodFile
+		}	
 	} else {
 		print $0 >> goodFile
 	}
@@ -149,21 +158,55 @@ print length(NTc) "\t" length(ISc) "\t" length(QNf) > complexityFile
 	}
 }' "$1" - "$tempFile"
 
-echo "Creating BAM..."
-samtools view -b1h "${pi}/${fn}-good.sam" -o "${pi}/${fn}-good.bam"
-samtools index "${pi}/${fn}-good.bam"
-#because of two pass construction, bad.sam needs to be sorted
-samtools sort "${pi}/${fn}-bad.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-bad.bam"
-samtools index "${pi}/${fn}-bad.bam"
-samtools sort "${pi}/${fn}-cc.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-cc.bam"
-samtools index "${pi}/${fn}-cc.bam"
+#echo "Creating BAM..."
+#samtools view -b1h "${pi}/${fn}-good.sam" -o "${pi}/${fn}-good.bam"
+#samtools index "${pi}/${fn}-good.bam"
+##because of two pass construction, bad.sam needs to be sorted
+#samtools sort "${pi}/${fn}-bad.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-bad.bam"
+#samtools index "${pi}/${fn}-bad.bam"
+#samtools sort "${pi}/${fn}-cc.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-cc.bam"
+#samtools index "${pi}/${fn}-cc.bam"
 
+echo "Creating fastq..."
+test1=$(samtools view -c -f 1 ${pi}/${fn}-good.sam)
+if [[ $test1 -ne 0 ]];then
+	if [ -f "${pi}/${fn}-good.sam" ];then	
+		samtools sort -n "${pi}/${fn}-good.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
+		samtools fastq -1 "${pi}/${fn}-R1.fastq" -2 "${pi}/${fn}-R2.fastq" "${pi}/${fn}-rsort.temp"
+	fi
+        if [ -f "${pi}/${fn}-IS.sam" ];then
+		samtools sort -n "${pi}/${fn}-IS.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
+		samtools fastq -1 "${pi}/${fn}-IS-R1.fastq" -2 "${pi}/${fn}-IS-R2.fastq" "${pi}/${fn}-rsort.temp"
+	fi
+        if [ -f "${pi}/${fn}-bad.sam" ];then
+		samtools sort -n "${pi}/${fn}-bad.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
+		samtools fastq -1 "${pi}/${fn}-bad-R1.fastq" -2 "${pi}/${fn}-bad-R2.fastq" "${pi}/${fn}-rsort.temp"
+	fi
+	if [ -f "${pi}/${fn}-CC.sam" ];then
+		samtools sort -n "${pi}/${fn}-CC.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
+		samtools fastq -1 "${pi}/${fn}-CC-R1.fastq" -2 "${pi}/${fn}-CC-R2.fastq" "${pi}/${fn}-rsort.temp"
+	fi
+else
+        if [ -f "${pi}/${fn}-good.sam" ];then
+		samtools fastq -0 "${pi}/${fn}-NT-R1.fastq.gz" "${pi}/${fn}-good.sam"
+        fi
+        if [ -f "${pi}/${fn}-IS.sam" ];then
+		samtools fastq -0 "${pi}/${fn}-IS-R1.fastq.gz" "${pi}/${fn}-IS.sam"
+        fi
+        if [ -f "${pi}/${fn}-bad.sam" ];then
+		samtools fastq -0 "${pi}/${fn}-bad-R1.fastq.gz" "${pi}/${fn}-bad.sam"
+	fi
+	if [ -f "${pi}/${fn}-CC.sam" ];then
+		samtools fastq -0 "${pi}/${fn}-CC-R1.fastq.gz" "${pi}/${fn}-CC.sam"
+	fi
+fi
 
 echo "Removing scratch files..."
+rm -f "${pi}/${fn}-IS.sam"
 rm -f "${pi}/${fn}-good.sam"
 rm -f "${pi}/${fn}-bad.sam"
 rm -f "${pi}/${fn}-cc.sam"
-rm -f "tempFile.sam"
+rm -f "${pi}/tempFile.sam"
 
 echo "Tablulating CC..."
 #if [[$(stat -c%s $complexityFile) > 0 ]];then
