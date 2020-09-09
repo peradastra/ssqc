@@ -2,7 +2,7 @@
 paired-end	false
 multiple-lanes	false
 fastq-files	/NGS/bham/200805/files1
-is_input	1e3
+is_input	1000
 cc_expected	300
 ref	./SARS-CoV_ISv0.3.2.fasta
 nt2is	./NT_IS_LOOKUP_TABLEv2.txt
