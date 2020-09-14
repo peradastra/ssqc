@@ -65,7 +65,7 @@ FILENAME==tempFile{
 	} else if($1 in badQname){
 		print $0 >> badFile #this will ensure R2, which could be recombo, does not end up in good bam
 	} else if (splitSeq) {
-		if ($3 ~ "_SNAQ") {
+		if ($3 ~ /_SNAQ/) {
 			print $0 >> isFile
 
 		} else {
@@ -101,7 +101,7 @@ FILENAME==tempFile{
 			print $1 " cigar Term " cd " not recognized" > "/dev/stderr"
 		}
 	}
-        if ($3 ~ /^nCov-19-5100-6119-CC/) { #put && ! ntf if eliminating recombinant CC
+	if ($3 ~ /^nCov-19-5100-6119-CC/) { #put && ! ntf if eliminating recombinant CC
 		if(!($1 in ccQname)) {
 			if ( $4 <= 5755 && ($4 + length($10)) >= 5765)	CCc++ #count reads, not both strands
 			ccQname[$1]=0
@@ -130,8 +130,8 @@ FILENAME==tempFile{
 			}
 		}
 	} else {
+		ntf=0
 		n=split(tmp,a,"")
-        	ntf=0
         	for (i=1;i<=n;i++){
         	        b=$3 ":" $4+i-1 a[i]
         	        if (b in NTs){
@@ -146,10 +146,9 @@ FILENAME==tempFile{
         	else {
         	        print $0 > tempFile #create this file to hold good reads, circle back later to remove bad mate pair
         	}
-	}
-
 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in ISc)) ISc[$1]=0   #contains cc domain
 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in NTc)) NTc[$1]=0  #contains cc domain
+	}
 }
 END {
 print length(NTc) "\t" length(ISc) "\t" length(QNf) > complexityFile 
@@ -158,14 +157,19 @@ print length(NTc) "\t" length(ISc) "\t" length(QNf) > complexityFile
 	}
 }' "$1" - "$tempFile"
 
-#echo "Creating BAM..."
-#samtools view -b1h "${pi}/${fn}-good.sam" -o "${pi}/${fn}-good.bam"
-#samtools index "${pi}/${fn}-good.bam"
-##because of two pass construction, bad.sam needs to be sorted
-#samtools sort "${pi}/${fn}-bad.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-bad.bam"
-#samtools index "${pi}/${fn}-bad.bam"
-#samtools sort "${pi}/${fn}-cc.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-cc.bam"
-#samtools index "${pi}/${fn}-cc.bam"
+echo "Creating BAM..."
+samtools view -b1h "${pi}/${fn}-good.sam" -o "${pi}/${fn}-good.bam"
+samtools index "${pi}/${fn}-good.bam"
+if [ -f "${pi}/${fn}-IS.sam" ];then
+	samtools view -b1h "${pi}/${fn}-IS.sam" -o "${pi}/${fn}-IS.bam"
+	samtools index "${pi}/${fn}-IS.bam"
+fi
+
+#because of two pass construction, bad.sam needs to be sorted
+samtools sort "${pi}/${fn}-bad.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-bad.bam"
+samtools index "${pi}/${fn}-bad.bam"
+samtools sort "${pi}/${fn}-cc.sam" -l 1 -@ 32 -m 1G -o "${pi}/${fn}-cc.bam"
+samtools index "${pi}/${fn}-cc.bam"
 
 echo "Creating fastq..."
 test1=$(samtools view -c -f 1 ${pi}/${fn}-good.sam)
@@ -202,10 +206,10 @@ else
 fi
 
 echo "Removing scratch files..."
-rm -f "${pi}/${fn}-IS.sam"
-rm -f "${pi}/${fn}-good.sam"
-rm -f "${pi}/${fn}-bad.sam"
-rm -f "${pi}/${fn}-cc.sam"
+#rm -f "${pi}/${fn}-IS.sam"
+#rm -f "${pi}/${fn}-good.sam"
+#rm -f "${pi}/${fn}-bad.sam"
+#rm -f "${pi}/${fn}-cc.sam"
 rm -f "${pi}/tempFile.sam"
 
 echo "Tablulating CC..."
@@ -220,7 +224,7 @@ FNR == last {
 }
 END {
 	print "SampleID\tTarget\tSequence\tCount\tNT_Coverage\tIS_Coverage\tCC_Coverage" > outFile1
-	print "SampleID\tTarget\tUniqueCount\tNT_Coverage\tIS_Coverage" > outFile2
+	print "SampleID\tTarget\tUniqueCount\tNT_Coverage\tIS_Coverage\tCC_Coverage" > outFile2
 	for (key in uSEQ) {
 		print key "\t" uSEQ[key] "\t" coverage > outFile1
 		split(key,arr,"\t")

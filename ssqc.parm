@@ -1,7 +1,7 @@
 #comment
-paired-end	false
+paired-end	true
 multiple-lanes	false
-fastq-files	/NGS/bham/200805/files1
+fastq-files	/NGS/USAF/200914/files
 is_input	1000
 cc_expected	300
 ref	./SARS-CoV_ISv0.3.2.fasta

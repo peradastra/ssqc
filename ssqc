@@ -54,7 +54,7 @@ while read -r val;do
 done < "$1"
 
 pi=$(dirname "$input")
-echo -e "SAMPLE\tPOOL\tCCQC\tLOAD"> "${pi}/runQC.txt"
+echo -e "SAMPLE\tPOOL\tNT_COV\tIS_COV\tCC_COV\tCCQC\tLOAD"> "${pi}/runQC.txt"
 
 while read -r line; do
 if [[ ! "$line" =~ ^# ]];then
@@ -73,12 +73,16 @@ echo "Aligning..."
 		bwa mem -t 32 $ref $line | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
-	rm -f "${pi}/${fn}.bam"	
+#	rm -f "${pi}/${fn}.bam"
+samtools index "${pi}/${fn}.bam"
 
-	awk -v output="${pi}/runQC.txt" -v cc_expected=$cc_expected -v is_input=$is_input '$2==1 {
-	printf "%s\t%s\t%f\t%i\n", $1, "1",($5/($5+$4)*$3)/cc_expected,$4/$5*is_input >> output}
-	$2==2 {printf "%s\t%s\t%f\t%i\n", $1,"2", ($5/($5+$4)*$3)/cc_expected,$4/$5*is_input >> output}
-	' "${pi}/${fn}.bam_CC-read-counts.txt"
+	rm -f "${pi}/${fn}-rsort.temp"
+	awk -v output="${pi}/runQC.txt" -v cc_expected=$cc_expected -v is_input=$is_input '{ if($2==1) {pn="1"} else if ($2==2) {pn="2"} else {pn="0"}
+	if (pn != 0) {printf "%s\t%s\t%i\t%i\t%i", $1, pn,$4,$5,$3 >> output
+		if($5+$4==0){printf "\t%s", "ND" >> output} else {printf "\t%f",($5/($5+$4)*$3)/cc_expected >> output}
+		if($5==0){printf "\t%s\n", "ND" >> output} else {printf "\t%i\n" , $4/$5*is_input >> output}
+		}
+	}' "${pi}/${fn}.bam_CC-read-counts.txt"
 	
 	
 #	./remPrimers "/NGS/sanger/REFS/ActicV3-bamClipper.bed" "${pi}/${fn}-good.bam"
