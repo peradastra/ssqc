@@ -230,6 +230,7 @@ END {
 		split(key,arr,"\t")
 		cUniq[arr[1]"\t"arr[2]]++
 	}
+	
 	for (key in cUniq) {
 		print key "\t" cUniq[key] "\t" coverage > outFile2
 	}

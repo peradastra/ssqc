@@ -1,30 +1,34 @@
 #!/bin/bash -e
-##coverage <files.txt>
+##coverage <files.txt> <path/to/run/coverage/file>
 ## files.txt is path of positionally sorted and indexed bams
 ## name.bam > bamstats04 > awk > name.coverage
 ## may want to add mapq and length filters for the reads.
 
-input=${1}
-echo -e "filter\tsample\tCHROM\tPOS\tcoverage" > "coverage.txt"
-while read -r line
-do
+fp=$(dirname "$1")
+fn=$(basename "$1")
+java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-good.bam" >> "${1}-NT.coverage"
+java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-IS.bam" >> "${1}-IS.coverage"
+java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-bad.bam" >> "${1}-bad.coverage"
+java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-cc.bam" >> "${1}-cc.coverage"
 
-if [[ ! $line =~ ^# ]];then
-	pi=$(dirname "${line}")
-	fp=$(basename "$line")
-        [ ${fp%%*.} == "gz" ] && { fn=${fp%.gz}; fe="gz"; } || { fn=${fp%.fastq.gz}; fe="fastq.gz"; }
-        [ ${fp%%*.} == "fastq" ] && { fn=${fp%.fastq}; fe="fastq"; }
-        [[ $fe != "fastq.gz" && $fe != "fastq" ]] && { echo "Bad file extention for $fp, must be .fastq or .fastq.gz"; exit 1; }
-java -jar /NGS/downloads/jvarkit/dist/bamstats04.jar -B VarDict-amplicon.bed "${pi}/${fn}-good.bam" > "${pi}/${fn}-NT.coverage"
-java -jar /NGS/downloads/jvarkit/dist/bamstats04.jar -B VarDict-amplicon.bed "${pi}/${fn}-IS.bam" > "${pi}/${fn}-IS.coverage"
-java -jar /NGS/downloads/jvarkit/dist/bamstats04.jar -B VarDict-amplicon.bed "${pi}/${fn}-bad.bam" > "${pi}/${fn}-bad.coverage"
-java -jar /NGS/downloads/jvarkit/dist/bamstats04.jar -B VarDict-amplicon.bed "${pi}/${fn}-cc.bam" > "${pi}/${fn}-cc.coverage"
+awk -v filestr=$fn -v fo="$2" 'FILENAME ~ /-NT.coverage$/ {
+	if (NR != 1 && $1=="MN908947.3") {
+		NTc+=$9;NTr++
+	} else {next}
+}	
+FILENAME ~ /-IS.coverage$/ {
+	if (NR != 1 && $1=="MN908947.3_SNAQ") {
+		ISc+=$9;ISr++
+	} else {next}
+}
+FILENAME ~ /-bad.coverage$/ {
+	if (NR !=1) {
+		BAc+=$9;BAr++
+	}
+}END {if (NTr>0) {NTa=int(NTc/NTr)} else {NTa="ND"}
+	if (ISr>0) {ISa=int(ISc/ISr)} else {ISa="ND"}
+	if (BAr>0) {BAa=int(BAc/BAr)} else {BAa="ND"}
+	print filestr "\t" NTa "\t" ISa "\t" BAa >> fo
+}' "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage"
 
-awk -v filterstr="NT" -v filestr=$fn 'NR==1 {next}{print filterstr "\t" filestr "\t" $1 "\t" $2 "\t" $9 >> "coverage.txt"}' "${pi}/${fn}-NT.coverage"
-awk -v filterstr="IS" -v filestr=$fn 'NR==1 {next}{print filterstr "\t" filestr "\t" $1 "\t" $2 "\t" $9 >> "coverage.txt"}' "${pi}/${fn}-IS.coverage"
-awk -v filterstr="bad" -v filestr=$fn 'NR==1 {next}{print filterstr "\t" filestr "\t" $1 "\t" $2 "\t" $9 >> "coverage.txt"}' "${pi}/${fn}-bad.coverage"
-awk -v filterstr="cc" -v filestr=$fn 'NR==1 {next}{print filterstr "\t" filestr "\t" $1 "\t" $2 "\t" $9 >> "coverage.txt"}' "${pi}/${fn}-cc.coverage"
 
-fi
-
-done < "$input"

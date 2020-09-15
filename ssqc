@@ -55,6 +55,7 @@ done < "$1"
 
 pi=$(dirname "$input")
 echo -e "SAMPLE\tPOOL\tNT_COV\tIS_COV\tCC_COV\tCCQC\tLOAD"> "${pi}/runQC.txt"
+echo -e "SAMPLE\tNT_COV\tIS_COV\tREC_COV" > "${pi}/coverage.txt"
 
 while read -r line; do
 if [[ ! "$line" =~ ^# ]];then
@@ -66,11 +67,12 @@ echo $line
 	[[ $fe != "fastq.gz" && $fe != "fastq" ]] && { echo "Bad file extention for $fp, must be .fastq or .fastq.gz"; exit 1; }	
  
 echo "Aligning..."
+	rg='@RG\tID:$fn\tSM:$fn\tLB:NA\tPL:SNAQ'
 	if [ $pe == 1 ];then
 		read -r line2
- 		bwa mem -t 32 $ref $line $line2 | samtools sort -@1G -o "${pi}/${fn}.bam" -  
+ 		bwa mem -R $rg -t 32 $ref $line $line2 | samtools sort -@1G -o "${pi}/${fn}.bam" -  
 	else
-		bwa mem -t 32 $ref $line | samtools sort -@1G -o "${pi}/${fn}.bam" -
+		bwa mem -R $rg -t 32 $ref $line | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
 #	rm -f "${pi}/${fn}.bam"
@@ -84,7 +86,7 @@ samtools index "${pi}/${fn}.bam"
 		}
 	}' "${pi}/${fn}.bam_CC-read-counts.txt"
 	
-	
+	./coverage "${pi}/${fn}" "${pi}/coverage.txt"	
 #	./remPrimers "/NGS/sanger/REFS/ActicV3-bamClipper.bed" "${pi}/${fn}-good.bam"
 #	./realign.2 "${pi}/${fn}-good.hc.bam"
 #	/NGS/VC "${pi}/${fn}-good.hc.ra.bam"
