@@ -9,6 +9,7 @@
 ##    After samtools view input done, each read in tempFile exists in badQname table, if yes move read to bad.sam; else add to good.sam
 ##Complexity Control extraction.  If RefName indicates CC, hard coded position extracted into a file: SampleID PoolID Sequence
 ##	The CC uses the bases flanking the Ns to ensure alignment was correct.
+##	NT and IS CC regions counted to allow for future relative yield calculations.
 ##splitSeq boolean indicates if the NT and IS should be split
 ##Clean up: covert sam to bam, index, tabulate CC results, remove primer sequences in preparation for VCF.
 ## Version:
@@ -146,12 +147,15 @@ FILENAME==tempFile{
         	else {
         	        print $0 > tempFile #create this file to hold good reads, circle back later to remove bad mate pair
         	}
-	if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in ISc)) ISc[$1]=0   #contains cc domain
-	if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in NTc)) NTc[$1]=0  #contains cc domain
+# Count pool1 or pool2 CC regions, must have mapq >4 and not recombinant
+        if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5534 && ($4 + length($10)) >= 5544 && !($1 in ISc1)) ISc1[$1]=0   #contains cc domain
+        if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5534 && ($4 + length($10)) >= 5544 && !($1 in NTc1)) NTc1[$1]=0  #contains cc domain
+ 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in ISc2)) ISc2[$1]=0   #contains cc domain
+	if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in NTc2)) NTc2[$1]=0  #contains cc domain
 	}
 }
 END {
-print length(NTc) "\t" length(ISc) "\t" length(QNf) > complexityFile 
+print length(NTc1) "\t" length(ISc1) "\t" length(NTc2) "\t" length(ISc2) "\t" length(QNf) > complexityFile 
 	for (key in NTs){
 		print key "\t" NTs[key] > hashTallies 
 	}
@@ -214,17 +218,22 @@ rm -f "${pi}/tempFile.sam"
 
 echo "Tablulating CC..."
 #if [[$(stat -c%s $complexityFile) > 0 ]];then
-awk -v outFile1="${pi}/${fn}-CC-counts.txt" -v outFile2="${2}_CC-read-counts.txt" ' 
-FNR==NR{last++;next}
+
+## Read through <prefix>-CC.txt
+##   Create count of each unique <ID><type><seq>
+##   Last row of <prefix>-CC.txt has NT1 IS1 NT2 IS2 totCC_reads
+awk -v outFile1="${pi}/${fn}-CC-counts.txt" -v outFile2="${2}_CC-read-counts.txt" 'FNR==NR{
+	last++;next
+}
 FNR != last {
 	uSEQ[$1 "\t" $2 "\t" $3]++
 }
 FNR == last {
-	coverage=$1 "\t" $2 "\t" $3	
+	coverage=$1 "\t" $2 "\t" $3 "\t" $4 "\t" $5	
 }
 END {
-	print "SampleID\tTarget\tSequence\tCount\tNT_Coverage\tIS_Coverage\tCC_Coverage" > outFile1
-	print "SampleID\tTarget\tUniqueCount\tNT_Coverage\tIS_Coverage\tCC_Coverage" > outFile2
+	print "SampleID\tTarget\tSequence\tCount\tNT_P1\tIS_P1\tNT_P2\tIS_P2\tCC_Coverage" > outFile1
+	print "SampleID\tTarget\tUniqueCount\tNT_P1\tIS_P1\tNT_P2\tIS_P2\tCC_Coverage" > outFile2
 	for (key in uSEQ) {
 		print key "\t" uSEQ[key] "\t" coverage > outFile1
 		split(key,arr,"\t")
@@ -234,6 +243,5 @@ END {
 	for (key in cUniq) {
 		print key "\t" cUniq[key] "\t" coverage > outFile2
 	}
-	
 }' "$complexityFile" "$complexityFile"
 
