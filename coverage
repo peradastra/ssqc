@@ -1,5 +1,5 @@
 #!/bin/bash -e
-##coverage <files.txt> <path/to/run/coverage/file>
+##coverage </path/rootFileName> <path/to/run/coverage/file>
 ## files.txt is path of positionally sorted and indexed bams
 ## name.bam > bamstats04 > awk > name.coverage
 ## may want to add mapq and length filters for the reads.
@@ -25,10 +25,11 @@ FILENAME ~ /-bad.coverage$/ {
 	if (NR !=1) {
 		BAc+=$9;BAr++
 	}
-}END {if (NTr>0) {NTa=int(NTc/NTr)} else {NTa="ND"}
-	if (ISr>0) {ISa=int(ISc/ISr)} else {ISa="ND"}
-	if (BAr>0) {BAa=int(BAc/BAr)} else {BAa="ND"}
-	print filestr "\t" NTa "\t" ISa "\t" BAa >> fo
+}END {printf ("%s\t%i\t%i\t%i\t", filestr, NTc, ISc, BAc) >> fo
+	if (NTr>0) {NTa=(NTc/NTr)} else {NTa="ND"}
+	if (ISr>0) {ISa=(ISc/ISr)} else {ISa="ND"}
+	if (BAr>0) {BAa=(BAc/BAr)} else {BAa="ND"}
+	printf ("%.2f\t%.2f\t%.2f\n", NTa, ISa, BAa) >> fo
 }' "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage"
 
 
