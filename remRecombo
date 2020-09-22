@@ -110,8 +110,8 @@ FILENAME==tempFile{
 		}
 		print $0 >> ccFile
 		t2 = 655 - $4 + 1
-		if (t2 >0 && t2 < length($10) && !($1 in QNf)) { #QNf ensures no double counting
-			QNf[$1]=0
+		if (t2 >0 && t2 < length($10) && !($1 in CCc2)) { #ensures no double counting
+			CCc2[$1]=0
 
 			t1=substr(tmp,t2,10)
 			if(t1 ~/^T[AGTC]{8}G/) {
@@ -120,11 +120,11 @@ FILENAME==tempFile{
 				printf("%s\t%s\t%s\n", sampleName, "b", t1) > complexityFile
 			}
 		} else {
-			t2=434 - $4 +1 
-			if (t2 >0 && t2 < length($10) && !($1 in QNf)) {
-				QNf[$1]=0
+			t2=433 - $4 +1 
+			if (t2 >0 && t2 < length($10) && !($1 in CCc1)) {
+				CCc1[$1]=0
 				t1=substr(tmp,t2,10)
-				if (t1 ~/A[AGTC]{8}G/) {
+				if (t1 ~/G[AGTC]{8}T/) {
 					printf("%s\t%s\t%s\n", sampleName, "1", t1) > complexityFile 
                         	} else {
 					printf("%s\t%s\t%s\n", sampleName, "a", t1) > complexityFile
@@ -149,14 +149,14 @@ FILENAME==tempFile{
         	        print $0 > tempFile #create this file to hold good reads, circle back later to remove bad mate pair
         	}
 # Count pool1 or pool2 CC regions, must have mapq >4 and not recombinant
-        if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5534 && ($4 + length($10)) >= 5544 && !($1 in ISc1)) ISc1[$1]=0   #contains cc domain
-        if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5534 && ($4 + length($10)) >= 5544 && !($1 in NTc1)) NTc1[$1]=0  #contains cc domain
- 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in ISc2)) ISc2[$1]=0   #contains cc domain
-	if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5755 && ($4 + length($10)) >= 5765 && !($1 in NTc2)) NTc2[$1]=0  #contains cc domain
+        if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5532 && ($4 + length($10)) >= 5541 && !($1 in ISc1)) ISc1[$1]=0   #contains cc domain
+        if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5532 && ($4 + length($10)) >= 5541 && !($1 in NTc1)) NTc1[$1]=0  #contains cc domain
+ 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5754 && ($4 + length($10)) >= 5763 && !($1 in ISc2)) ISc2[$1]=0   #contains cc domain
+	if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5754 && ($4 + length($10)) >= 5763 && !($1 in NTc2)) NTc2[$1]=0  #contains cc domain
 	}
 }
 END {
-print length(NTc1) "\t" length(ISc1) "\t" length(NTc2) "\t" length(ISc2) "\t" length(QNf) > complexityFile 
+print length(NTc1) "\t" length(ISc1) "\t" length(CCc1) "\t" length(NTc2) "\t" length(ISc2) "\t" length(CCc2) > complexityFile 
 	for (key in NTs){
 		print key "\t" NTs[key] > hashTallies 
 	}
@@ -230,11 +230,11 @@ FNR != last {
 	uSEQ[$1 "\t" $2 "\t" $3]++
 }
 FNR == last {
-	coverage=$1 "\t" $2 "\t" $3 "\t" $4 "\t" $5	
+	coverage=$1 "\t" $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6	
 }
 END {
-	print "SampleID\tTarget\tSequence\tCount\tNT_P1\tIS_P1\tNT_P2\tIS_P2\tCC_Coverage" > outFile1
-	print "SampleID\tTarget\tUniqueCount\tNT_P1\tIS_P1\tNT_P2\tIS_P2\tCC_Coverage" > outFile2
+	print "SampleID\tTarget\tSequence\tCount\tNT_P1\tIS_P1\tCC_P2\tNT_P2\tIS_P2\tCC_P2" > outFile1
+	print "SampleID\tTarget\tUniqueCount\tNT_P1\tIS_P1\tCC_P1\tNT_P2\tIS_P2\tCC_P2" > outFile2
 	for (key in uSEQ) {
 		print key "\t" uSEQ[key] "\t" coverage > outFile1
 		split(key,arr,"\t")
