@@ -1,7 +1,7 @@
 #!/bin/bash -e
 ##coverage </path/rootFileName> <path/to/run/coverage/file>
-## files.txt is path of positionally sorted and indexed bams
-## name.bam > bamstats04 > awk > name.coverage
+## Program flow: use bamstats to count each amplicon in NT, IS, recombinant and CC bams ($1 contains prefix to bam files).
+##	awk script sums all amplicon counts for each bam, makes table indicated by $2
 ## may want to add mapq and length filters for the reads.
 
 fp=$(dirname "$1")
@@ -32,4 +32,7 @@ FILENAME ~ /-bad.coverage$/ {
 	printf ("%.2f\t%.2f\t%.2f\n", NTa, ISa, BAa) >> fo
 }' "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage"
 
+#clean up
+#rm -f "${1}-good.bam" "${1}-IS.bam" "${1}-bad.bam" "${1}-cc.bam"
+#rm -f "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage" "${1}-cc.coverage"
 

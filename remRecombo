@@ -2,16 +2,17 @@
 
 ##usage: remRecombo <lookupTable> <bam> <splitSeq>
 ## For SNAQ analysis requiring reads containing both control and native sequences.
-## Create bad and good read file place holders with bam header,
+## Create bad and good read file place-holders with bam header,
 ## awk Import NT IS lookup table, create recombinant hash table RefName : POS : base, where base is switched between IS and NT
 ##    Use cigar for each read and look at each position to see if found in hash (if yes, it's a recombinate or unfortunate NGS error/mutant,
 ##    add QName to badQname table and read added to bad.sam; else read added to tempFile
-##    After samtools view input done, each read in tempFile exists in badQname table, if yes move read to bad.sam; else add to good.sam
-##Complexity Control extraction.  If RefName indicates CC, hard coded position extracted into a file: SampleID PoolID Sequence
-##	The CC uses the bases flanking the Ns to ensure alignment was correct.
-##	NT and IS CC regions counted to allow for future relative yield calculations.
-##splitSeq boolean indicates if the NT and IS should be split
-##Clean up: covert sam to bam, index, tabulate CC results, remove primer sequences in preparation for VCF.
+##    After samtools view input done, test each queryName in tempFile exists in badQname table, if yes move read to bad.sam; else add to good.sam
+##Complexity Control extraction.  If RefName contains CC, hard coded position extracted into a file: SampleID matchQuality/PoolID Sequence.
+##		a or b indicates bad CC from pool1 or pool2, other wise 1 or 2 indicates CC sequence passed QC and indicates it source.
+##	CC QC uses the bases flanking the Ns to ensure alignment was correct.
+##	NT and IS CC-regions counted to allow for future relative yield calculations.
+##splitSeq boolean indicates if the NT and IS should be split to create separated FASTQ
+##Clean up: covert sam to bam, index, create fastq, tabulate CC results
 ## Version:
 ##	0.1 First release, uses concatenated IS
 ##	0.2 Add removal of pairs, instead of either R1 or R2
@@ -180,19 +181,19 @@ test1=$(samtools view -c -f 1 ${pi}/${fn}-good.sam)
 if [[ $test1 -ne 0 ]];then
 	if [ -f "${pi}/${fn}-good.sam" ];then	
 		samtools sort -n "${pi}/${fn}-good.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-R1.fastq" -2 "${pi}/${fn}-R2.fastq" "${pi}/${fn}-rsort.temp"
+		samtools fastq -1 "${pi}/${fn}-NT-R1.fastq.gz" -2 "${pi}/${fn}-NT-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
 	fi
         if [ -f "${pi}/${fn}-IS.sam" ];then
 		samtools sort -n "${pi}/${fn}-IS.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-IS-R1.fastq" -2 "${pi}/${fn}-IS-R2.fastq" "${pi}/${fn}-rsort.temp"
+		samtools fastq -1 "${pi}/${fn}-IS-R1.fastq.gz" -2 "${pi}/${fn}-IS-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
 	fi
         if [ -f "${pi}/${fn}-bad.sam" ];then
 		samtools sort -n "${pi}/${fn}-bad.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-bad-R1.fastq" -2 "${pi}/${fn}-bad-R2.fastq" "${pi}/${fn}-rsort.temp"
+		samtools fastq -1 "${pi}/${fn}-bad-R1.fastq.gz" -2 "${pi}/${fn}-bad-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
 	fi
 	if [ -f "${pi}/${fn}-CC.sam" ];then
 		samtools sort -n "${pi}/${fn}-CC.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-CC-R1.fastq" -2 "${pi}/${fn}-CC-R2.fastq" "${pi}/${fn}-rsort.temp"
+		samtools fastq -1 "${pi}/${fn}-CC-R1.fastq.gz" -2 "${pi}/${fn}-CC-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
 	fi
 else
         if [ -f "${pi}/${fn}-good.sam" ];then
@@ -244,4 +245,6 @@ END {
 		print key "\t" cUniq[key] "\t" coverage > outFile2
 	}
 }' "$complexityFile" "$complexityFile"
+
+#rm -f "$complexityFile"
 

@@ -1,17 +1,19 @@
 #!/bin/bash -e
 ## ssqc <path/to/parm.file>
 ## parm.file: 
-## paired-end	true or false if sequence is paired end (note: collaps samples that cross lanes e.g., cat <name-L00[1-4]-R1.fastq.gz > name-R1.fastq.gz)
-## fastq-files	</path/to/file> contains a list of fastq.gz files, paired ends alternate with naming convension name-R1.fastq.gz and name-R2.fastq.gz
-## is_input	<integer> copies of internal standard added to sample.
-## cc_expected	<integer> determined after several runs..expected count of unique CC sequences when no significant NT competition.
-## nt2is </path/to/file> contains the mapping of NT to IS, base changes in lowercase
-## ref </path/to/files> path to the reference genome
-## split <true/false> determine if the NT and IS reads are to divided into separate bam and fastq
+##   paired-end	true or false if sequence is paired end (note: collaps samples that cross lanes e.g., cat <name-L00[1-4]-R1.fastq.gz > name-R1.fastq.gz)
+##   fastq-files	</path/to/file> contains a list of fastq.gz files, paired ends alternate with naming convension name-R1.fastq.gz and name-R2.fastq.gz
+##   is_input	<integer> copies of internal standard added to sample.
+##   cc_expected	<integer> determined after several runs..expected count of unique CC sequences when no significant NT competition.
+##   nt2is </path/to/file> contains the mapping of NT to IS, base changes in lowercase
+##   ref </path/to/files> path to the reference genome
+##   split <true/false> determine if the NT and IS reads are to divided into separate bam and fastq
 ##
+## Program flow: read parameters; align reads; call remRecombinants; calculate coverage; create runQC table; calculate viral load
 ## viral load calculated from total amplicon reads (NT + recombinants/2) / (IS + recombinant/2) * IS_INPUT
-##   total recombinant amplicon reads should be half NT and half IS, hence the recombinant/2 contribution.
-## coverage is calculated using bamstats amplicon counting method
+##   Total recombinant amplicon reads should be half NT and half IS, hence the recombinant/2 contribution.
+## runQC uses the NT and IS CC-reads to adjust expected complexity capture (cc_expected) for competition.  Unique CC sequences calculated from -CC-counts.txt
+## Coverage calculated using bamstats amplicon counting method
 
 while read -r val;do
 	if [[ "$val" =~ ^paired-end ]];then 
@@ -58,7 +60,8 @@ while read -r val;do
 
 done < "$1"
 
-pi=$(dirname "$input")
+pi=$(dirname "$input");pi="$pi/snaq"
+[ ! -d "$pi" ] && mkdir "$pi"
 runQC="${pi}/runQC.txt"
 coverage="${pi}/coverage.txt"
 viralLoad="${pi}/viralLoad.txt"
@@ -67,20 +70,37 @@ echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$cov
 
 while read -r line; do
 if [[ ! "$line" =~ ^# ]];then
-echo $line
-	pi=$(dirname "$line")
+	echo $line
 	fp=$(basename "$line")
+	# if bam files, make fastq for bwa
+	if [ ${line: -4} == ".bam" ];then
+		fn=${fp%.bam}; fe="fastq.gz"
+		fbam=1
+		if [ $pe == 1 ];then
+			echo "bam to paired fastq..."
+                	samtools sort -n "$line" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
+                	samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -s "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
+			ip1="${pi}/${fn}-R1.fastq.gz"; ip2="${pi}/${fn}-R2.fastq.gz"
+		else
+			echo "bam to single fastq..."
+	                samtools fastq -0 "${pi}/${fn}-R1.fastq.gz" "$line"
+			ip1="${pi}/${fn}-R1.fastq.gz"
+		fi
+	else
+		ip1="$line"
+		fbam=0
+	# if fastq, determine if .gz
 	[ ${fp%%*.} == "gz" ] && { fn=${fp%.gz}; fe="gz"; } || { fn=${fp%.fastq.gz}; fe="fastq.gz"; }
-	[ ${fp%%*.} == "fastq" ] && { fn=${fp%.fastq}; fe="fastq"; }
-	[[ $fe != "fastq.gz" && $fe != "fastq" ]] && { echo "Bad file extention for $fp, must be .fastq or .fastq.gz"; exit 1; }	
- 
-echo "Aligning..."
+		[ ${fp%%*.} == "fastq" ] && { fn=${fp%.fastq}; fe="fastq"; }
+		[[ $fe != "fastq.gz" && $fe != "fastq" ]] && { echo "Bad file extention for $fp, must be .fastq or .fastq.gz"; exit 1; }	
+ 	fi
+	echo "Aligning..."
 	rg='@RG\tID:$fn\tSM:$fn\tLB:NA\tPL:SNAQ'
 	if [ $pe == 1 ];then
-		read -r line2
- 		bwa mem -R $rg -t 32 $ref $line $line2 | samtools sort -@1G -o "${pi}/${fn}.bam" -  
+		[ fbam == 0 ] && read -r ip2
+ 		bwa mem -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" -  
 	else
-		bwa mem -R $rg -t 32 $ref $line | samtools sort -@1G -o "${pi}/${fn}.bam" -
+		bwa mem -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
 
@@ -100,13 +120,15 @@ echo "CC QC..."
 	#old viral load calc if($5==0){printf "\t%s\n", "ND" >> output} else {printf "\t%i\n" , $4/$5*is_input >> output}
 	}}' "${pi}/${fn}.bam_CC-read-counts.txt"
 	
+#rm -f "${pi}/${fn}.bam_CC-read-counts.txt"
 
+#possible code for VAF QC
 #	./remPrimers "/NGS/sanger/REFS/ActicV3-bamClipper.bed" "${pi}/${fn}-good.bam"
 #	./realign.2 "${pi}/${fn}-good.hc.bam"
 #	/NGS/VC "${pi}/${fn}-good.hc.ra.bam"
 fi
 done < "$input"
-
+echo "Calculating viral load..."
 echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
 awk -v is_input=$is_input -v vl="$viralLoad" 'FNR==1 {next}
 {
@@ -116,6 +138,7 @@ awk -v is_input=$is_input -v vl="$viralLoad" 'FNR==1 {next}
                 vlr=( $2 + ($4 / 2) )/($3 + ($4 / 2) ) * is_input
         }
         printf "%s\t%i\t%i\t%i\t%i\t%.1f\n", $1, $2 , $3 , $4 , is_input , vlr >> vl
-}' "${pi}/coverage.txt"
+}' "$coverage"
 
+#rm -f "${pi}/coverage.txt"
 echo "DONE."
