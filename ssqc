@@ -65,47 +65,66 @@ pi=$(dirname "$input");pi="$pi/snaq"
 runQC="${pi}/runQC.txt"
 coverage="${pi}/coverage.txt"
 viralLoad="${pi}/viralLoad.txt"
+refBN=$(basename "$ref")
+
 [ -f "$runQC" ] && echo "APPENDING TO $runQC" || echo -e "SAMPLE\tPOOL\tNT_READS\tIS_READS\tCC_READS\tCC_UNIQ\tCCQC" > "$runQC"
-echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$coverage"
+[ -f "$viralLoad" ] && echo "APPENDING TO $viralLoad" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
+[ -f "$coverage" ] && mv "$coverage" "$coverage.bak" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$coverage"
 
 while read -r line; do
 if [[ ! "$line" =~ ^# ]];then
 	echo $line
 	fp=$(basename "$line")
 	# if bam files, make fastq for bwa
-	if [ ${line: -4} == ".bam" ];then
+	if [[ ${line: -4} == ".bam" ]];then
 		fn=${fp%.bam}; fe="fastq.gz"
-		fbam=1
-		if [ $pe == 1 ];then
-			echo "bam to paired fastq..."
-                	samtools sort -n "$line" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-                	samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -s "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
-			ip1="${pi}/${fn}-R1.fastq.gz"; ip2="${pi}/${fn}-R2.fastq.gz"
+		
+		if $( samtools view -H "$line" | grep -q "$refBN" ); then
+			#aligned bam
+			ln -f "$line" "$pi"
+			fbam=2
+			echo "Skipping alignment..."
 		else
-			echo "bam to single fastq..."
-	                samtools fastq -0 "${pi}/${fn}-R1.fastq.gz" "$line"
-			ip1="${pi}/${fn}-R1.fastq.gz"
+			fbam=1
+			if [[ $pe == 1 ]];then
+				echo "bam to paired fastq..."
+                		samtools sort -n "$line" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
+                		samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -s "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
+				ip1="${pi}/${fn}-R1.fastq.gz"; ip2="${pi}/${fn}-R2.fastq.gz"
+			else
+				echo "bam to single fastq..."
+	                	samtools fastq -0 "${pi}/${fn}-R1.fastq.gz" "$line"
+				ip1="${pi}/${fn}-R1.fastq.gz"
+			fi
 		fi
 	else
 		ip1="$line"
 		fbam=0
-	# if fastq, determine if .gz
-	[ ${fp%%*.} == "gz" ] && { fn=${fp%.gz}; fe="gz"; } || { fn=${fp%.fastq.gz}; fe="fastq.gz"; }
-		[ ${fp%%*.} == "fastq" ] && { fn=${fp%.fastq}; fe="fastq"; }
-		[[ $fe != "fastq.gz" && $fe != "fastq" ]] && { echo "Bad file extention for $fp, must be .fastq or .fastq.gz"; exit 1; }	
+		# if fastq, determine if .gz
+		if [[ ${fp: -9} == ".fastq.gz" ]]; then
+			fn=${fp%.fastq.gz}; fe="fastq.gz"; 
+		elif [[ ${fp: -6} == ".fastq" ]]; then
+			fn=${fp%.fastq}; fe="fastq"; 
+		else 
+			echo "Bad file extention for $fp, must be .fastq or .fastq.gz"
+			exit 1
+		fi	
  	fi
-	echo "Aligning..."
-	rg='@RG\tID:$fn\tSM:$fn\tLB:NA\tPL:SNAQ'
-	if [ $pe == 1 ];then
-		[ fbam == 0 ] && read -r ip2
- 		bwa mem -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" -  
-	else
-		bwa mem -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
-	fi	
-	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
 
-#	rm -f "${pi}/${fn}.bam"
-samtools index "${pi}/${fn}.bam"
+	rg='@RG\tID:$fn\tSM:$fn\tLB:NA\tPL:SNAQ'
+	if [[ $pe == 1 && $fbam != 2 ]];then
+		[[ $fbam == 0 ]] && read -r ip2
+ 		 echo "Paired end aligning..."
+		 bwa mem -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" -  
+	elif [[ $fbam != 2 ]] ;then
+		 echo "Single end aligning..."
+		 bwa mem -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
+	fi	
+
+#	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
+#
+##	rm -f "${pi}/${fn}.bam"
+#samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
 echo "Coverage..."
@@ -129,7 +148,6 @@ echo "CC QC..."
 fi
 done < "$input"
 echo "Calculating viral load..."
-[ -f "$viralLoad" ] && echo "APPENDING TO $viralLoad" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
 awk -v is_input=$is_input -v vl="$viralLoad" 'FNR==1 {next}
 {
 	if ($3+$4==0) {

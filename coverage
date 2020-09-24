@@ -1,35 +1,36 @@
 #!/bin/bash -e
 ##coverage </path/rootFileName> <path/to/run/coverage/file>
 ## Program flow: use bamstats to count each amplicon in NT, IS, recombinant and CC bams ($1 contains prefix to bam files).
-##	awk script sums all amplicon counts for each bam, makes table indicated by $2
+##	awk script median amplicon reads + sums all amplicon counts for each bam, makes table indicated by $2
 ## may want to add mapq and length filters for the reads.
 
 fp=$(dirname "$1")
 fn=$(basename "$1")
-java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-good.bam" >> "${1}-NT.coverage"
-java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-IS.bam" >> "${1}-IS.coverage"
-java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-bad.bam" >> "${1}-bad.coverage"
-java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-cc.bam" >> "${1}-cc.coverage"
+#java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-good.bam" >> "${1}-NT.coverage"
+#java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-IS.bam" >> "${1}-IS.coverage"
+#java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-bad.bam" >> "${1}-bad.coverage"
+#java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-cc.bam" >> "${1}-cc.coverage"
 
 awk -v filestr=$fn -v fo="$2" 'FILENAME ~ /-NT.coverage$/ {
 	if (NR != 1 && $1=="MN908947.3") {
-		NTc+=$9;NTr++
+		na[nc++]=$9;nt+=$9
 	} else {next}
 }	
 FILENAME ~ /-IS.coverage$/ {
 	if (NR != 1 && $1=="MN908947.3_SNAQ") {
-		ISc+=$9;ISr++
+		ia[ic++]=$9;it+=$9
 	} else {next}
 }
 FILENAME ~ /-bad.coverage$/ {
 	if (NR !=1) {
-		BAc+=$9;BAr++
+		ba[bc++]=$9;bt+=$9
 	}
-}END {printf ("%s\t%i\t%i\t%i\t", filestr, NTc, ISc, BAc) >> fo
-	if (NTr>0) {NTa=(NTc/NTr)} else {NTa="ND"}
-	if (ISr>0) {ISa=(ISc/ISr)} else {ISa="ND"}
-	if (BAr>0) {BAa=(BAc/BAr)} else {BAa="ND"}
-	printf ("%.2f\t%.2f\t%.2f\n", NTa, ISa, BAa) >> fo
+}END {printf ("%s\t%i\t%i\t%i\t", filestr, nt, it, bt) >> fo
+	asort(na);asort (ia);asort (ib)
+	if ((nc % 2) == 1){nm=na[ int(nc/2) ]} else {nm=( na[nc/2] + na[nc/2-1])/2};
+	if ((ic % 2) == 1){im=ia[ int(ic/2) ]} else {im=( ia[ic/2] + ia[ic/2-1])/2};
+	if ((bc % 2) == 1){bm=ba[ int(bc/2) ]} else {bm=( ba[bc/2] + ba[bc/2-1])/2};
+	 printf ("%i\t%i\t%i\n", nm, im, bm ) >> fo
 }' "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage"
 
 #clean up
