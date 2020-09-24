@@ -121,10 +121,10 @@ if [[ ! "$line" =~ ^# ]];then
 		 bwa mem -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 
-	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
-
-#	rm -f "${pi}/${fn}.bam"
-samtools index "${pi}/${fn}.bam"
+#	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
+#
+##	rm -f "${pi}/${fn}.bam"
+#samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
 echo "Coverage..."
