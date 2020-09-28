@@ -46,7 +46,14 @@ while read -r val;do
         if [[ "$val" =~ ^ref ]];then
                 ref="$(cut -f2 <<< "$val")"
                 if [ ! -f "$ref" ]; then
-                        echo "Pathway to NT to IS mapping table incorrect"
+                        echo "Pathway to reference genome incorrect"
+                        exit 1
+                fi
+        fi
+        if [[ "$val" =~ ^covBed ]];then
+                covBed="$(cut -f2 <<< "$val")"
+                if [ ! -f "$covBed" ]; then
+                        echo "Pathway to bed coverage file incorrect"
                         exit 1
                 fi
         fi
@@ -60,16 +67,19 @@ while read -r val;do
 
 done < "$1"
 
-pi=$(dirname "$input");pi="$pi/snaq"
+sdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+pi="$(dirname "$input")"
+pi="$pi/snaq"
 [ ! -d "$pi" ] && mkdir "$pi"
 runQC="${pi}/runQC.txt"
 coverage="${pi}/coverage.txt"
 viralLoad="${pi}/viralLoad.txt"
 refBN=$(basename "$ref")
 
-[ -f "$runQC" ] && echo "APPENDING TO $runQC" || echo -e "SAMPLE\tPOOL\tNT_READS\tIS_READS\tCC_READS\tCC_UNIQ\tCCQC" > "$runQC"
-[ -f "$viralLoad" ] && echo "APPENDING TO $viralLoad" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
-[ -f "$coverage" ] && mv "$coverage" "$coverage.bak" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$coverage"
+[ -f "$runQC" ] && echo $(date +%x_%H:%M:%S) >> "$runQC" || echo -e "SAMPLE\tPOOL\tNT_READS\tIS_READS\tCC_READS\tCC_UNIQ\tCCQC" > "$runQC"
+[ -f "$viralLoad" ] &&  echo $(date +%x_%H:%M:%S) >> "$viralLoad" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
+[ -f "$coverage" ] && echo $(date +%x_%H:%M:%S) >> "$coverage" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$coverage"
 
 while read -r line; do
 if [[ ! "$line" =~ ^# ]];then
@@ -88,12 +98,16 @@ if [[ ! "$line" =~ ^# ]];then
 			fbam=1
 			if [[ $pe == 1 ]];then
 				echo "bam to paired fastq..."
-                		samtools sort -n "$line" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-                		samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -s "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
+                		if [ ! -f "${pi}/${fn}-R1.fastq.gz" ]; then
+					samtools sort -n "$line" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
+                			samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -s "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
+				fi
 				ip1="${pi}/${fn}-R1.fastq.gz"; ip2="${pi}/${fn}-R2.fastq.gz"
 			else
 				echo "bam to single fastq..."
-	                	samtools fastq -0 "${pi}/${fn}-R1.fastq.gz" "$line"
+	                	if [ ! -f "${pi}/${fn}-R1.fastq.gz" ];then
+					samtools fastq -0 "${pi}/${fn}-R1.fastq.gz" "$line"
+				fi
 				ip1="${pi}/${fn}-R1.fastq.gz"
 			fi
 		fi
@@ -111,25 +125,31 @@ if [[ ! "$line" =~ ^# ]];then
 		fi	
  	fi
 
+	#to do: handle concatenating <nameroot>_S[0-9]*__L00[1-4]_R[12]_001_<garbage>.fastq.gz (e.g., CTD2343_S164_L003_R1_001_200918.fastq.gz)
 	rg='@RG\tID:$fn\tSM:$fn\tLB:NA\tPL:SNAQ'
 	if [[ $pe == 1 && $fbam != 2 ]];then
 		[[ $fbam == 0 ]] && read -r ip2
- 		 echo "Paired end aligning..."
-		 bwa mem -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" -  
-	elif [[ $fbam != 2 ]] ;then
+ 		if [ ! -f "${pi}/${fn}.bam" ];then
+			 echo "Paired end aligning..."
+		 	bwa mem -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" - 
+		fi	
+	elif [[ $fbam != 2 && ! -f "${pi}/${fn}.bam" ]] ;then
 		 echo "Single end aligning..."
 		 bwa mem -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 
-#	./remRecombo "$nt2is" "${pi}/${fn}.bam" $splitSeq
-#
-##	rm -f "${pi}/${fn}.bam"
-#samtools index "${pi}/${fn}.bam"
+echo "Removing Rcecombinants..."
+	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
+
+#	rm -f "${pi}/${fn}.bam"
+samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
-echo "Coverage..."
-	./coverage "${pi}/${fn}" "$coverage"
-echo "CC QC..."
+
+	echo "Coverage..."
+	"$sdir/coverage" "${pi}/${fn}" "$coverage" "$covBed"
+
+	echo "CC QC..."
 	awk -v output="$runQC" -v cc_expected=$cc_expected -v is_input=$is_input '{if($2 == 1) {
 		printf "%s\t%s\t%i\t%i\t%i\t%i", $1, "1",$4,$5,$6,$3 >> output
                 if($5+$4==0){printf "\t%s\n", "ND" >> output} else {printf "\t%f\n",($5/($5+$4)*$3)/cc_expected >> output}
