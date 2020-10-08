@@ -24,7 +24,7 @@ awk -v filestr=$fn -v fo="$2" 'FILENAME ~ /-NT.coverage$/ {
 	} else {next}
 }	
 FILENAME ~ /-IS.coverage$/ {
-	if (NR != 1 && $1=="MN908947.3_SNAQ") {
+	if (NR != 1 && $1 ~ /-SNAQ$/) {
 		ar = int($9/($3 -$2))
 		 ia[ic++]=ar;it+=ar
 	} else {next}

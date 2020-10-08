@@ -4,6 +4,6 @@ multiple-lanes	false
 fastq-files	/NGS/USAF/200914/files1
 is_input	1000
 cc_expected	200
-ref	./SARS-CoV_ISv0.3.2.fasta
-nt2is	./NT_IS_LOOKUP_TABLEv2.txt
+ref	./SARS-CoV_ISv0.3.1_seperate.fasta
+nt2is	./NT_IS_LOOKUP_TABLE_v0.3.1_seperate.txt
 split	true	

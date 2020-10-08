@@ -66,6 +66,10 @@ while read -r val;do
         fi
 
 done < "$1"
+if [ -z "$covBed" ]; then echo "Missing bed Coverage path"; exit 1; fi
+if [ -z "$ref" ]; then echo "Missing reference genome path"; exit 1; fi
+if [ -z "$nt2is" ]; then echo "Missing NT to IS mapping table"; exit 1; fi
+if [ -z "$input" ]; then echo "Missing list of fasta file path"; exit 1; fi
 
 sdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -77,9 +81,12 @@ coverage="${pi}/coverage.txt"
 viralLoad="${pi}/viralLoad.txt"
 refBN=$(basename "$ref")
 
-[ -f "$runQC" ] && echo $(date +%x_%H:%M:%S) >> "$runQC" || echo -e "SAMPLE\tPOOL\tNT_READS\tIS_READS\tCC_READS\tCC_UNIQ\tCCQC" > "$runQC"
-[ -f "$viralLoad" ] &&  echo $(date +%x_%H:%M:%S) >> "$viralLoad" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
-[ -f "$coverage" ] && echo $(date +%x_%H:%M:%S) >> "$coverage" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$coverage"
+echo -e "SAMPLE\tPOOL\tNT_READS\tIS_READS\tCC_READS\tCC_UNIQ\tCCQC" > "$runQC"
+echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
+echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$coverage"
+#[ -f "$runQC" ] && echo $(date +%x_%H:%M:%S) >> "$runQC" || echo -e "SAMPLE\tPOOL\tNT_READS\tIS_READS\tCC_READS\tCC_UNIQ\tCCQC" > "$runQC"
+#[ -f "$viralLoad" ] &&  echo $(date +%x_%H:%M:%S) >> "$viralLoad" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tIS_INPUT\tVIRAL_LOAD" > "$viralLoad"
+#[ -f "$coverage" ] && echo $(date +%x_%H:%M:%S) >> "$coverage" || echo -e "SAMPLE\tNT_READS\tIS_READS\tREC_READS\tNT_AVG\tIS_AVG\tREC_AVG" > "$coverage"
 
 while read -r line; do
 if [[ ! "$line" =~ ^# ]];then

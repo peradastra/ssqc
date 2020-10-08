@@ -53,7 +53,7 @@ NR==FNR{
 		print $1 "\t" $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6 > "/dev/stderr"
 		exit 1
 	}
-	if($3 ~/[gatc]/) {
+	if($6 ~/[gatc]/) {
 		NTs[$1 ":" $2 toupper($6)]=0
 		NTs[$4 ":" $5 toupper($3)]=0
 	}
@@ -67,7 +67,7 @@ FILENAME==tempFile{
 	} else if($1 in badQname){
 		print $0 >> badFile #this will ensure R2, which could be recombo, does not end up in good bam
 	} else if (splitSeq) {
-		if ($3 ~ /_SNAQ/) {
+		if ($3 ~ /-SNAQ$/) {
 			print $0 >> isFile
 
 		} else {
@@ -103,9 +103,9 @@ FILENAME==tempFile{
 			print $1 " cigar Term " cd " not recognized" > "/dev/stderr"
 		}
 	}
-	if ($3 ~ /^nCov-19-5100-6119-CC/) { #put && ! ntf if eliminating recombinant CC
+	if ($3 ~ /-CC.[0-9]*$/) { #put && ! ntf if eliminating recombinant CC
 		if(!($1 in ccQname)) {
-			if ( $4 <= 5755 && ($4 + length($10)) >= 5765)	CCc++ #count reads, not both strands
+			if ( $4 <= 443 && ($4 + length($10)) >= 442)	CCc++ #count reads, not both strands
 			ccQname[$1]=0
 		}
 		print $0 >> ccFile
@@ -149,9 +149,9 @@ FILENAME==tempFile{
         	        print $0 > tempFile #create this file to hold good reads, circle back later to remove bad mate pair
         	}
 # Count pool1 or pool2 CC regions, must have mapq >4 and not recombinant
-        if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5532 && ($4 + length($10)) >= 5541 && !($1 in ISc1)) ISc1[$1]=0   #contains cc domain
+        if (!(ntf) && $5 >= 4 && $3 ~ /nCov-19-5110-7100_20ABYFCP.0-SNAQ/ && $4 <= 443 && ($4 + length($10)) >= 452 && !($1 in ISc1)) ISc1[$1]=0   #contains cc domain
         if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5532 && ($4 + length($10)) >= 5541 && !($1 in NTc1)) NTc1[$1]=0  #contains cc domain
- 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3_SNAQ" && $4 <= 5754 && ($4 + length($10)) >= 5763 && !($1 in ISc2)) ISc2[$1]=0   #contains cc domain
+ 	if (!(ntf) && $5 >= 4 && $3 ~ /nCov-19-5110-7100_20ABYFCP.0-SNAQ/ && $4 <= 665 && ($4 + length($10)) >= 674 && !($1 in ISc2)) ISc2[$1]=0   #contains cc domain
 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5754 && ($4 + length($10)) >= 5763 && !($1 in NTc2)) NTc2[$1]=0  #contains cc domain
 	}
 }
