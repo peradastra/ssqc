@@ -1,0 +1,50 @@
+ssqc <path/to/parm.file>
+Script reads parameter file (see below) for a file indicating which sequences to process.
+
+parm.file:
+  paired-end true or false if sequence is paired end (note: collaps samples that cross lanes e.g., cat <name-L00[1-4]-R1.fastq.gz > name-R1.fastq.gz)
+  fastq-files        </path/to/file> contains a list of fastq.gz files, paired ends alternate with naming convension name-R1.fastq.gz and name-R2.fastq.gz
+  is_input   <integer> copies of internal standard added to sample.
+  cc_expected        <integer> determined after several runs..expected count of unique CC sequences when no significant NT competition.
+  nt2is </path/to/file> contains the mapping of NT to IS, base changes in lowercase
+  ref </path/to/files> path to the reference genome
+  split <true/false> determine if the NT and IS reads are to divided into separate bam and fastq
+
+Program flow: read parameters; align reads; call remRecombinants; calculate coverage; create runQC table; calculate viral load
+viral load calculated from total amplicon reads (NT + recombinants/2) / (IS + recombinant/2) * IS_INPUT
+  Total recombinant amplicon reads should be half NT and half IS, hence the recombinant/2 contribution.
+runQC uses the NT and IS CC-reads to adjust expected complexity capture (cc_expected) for competition.  Unique CC sequences calculated from -CC-counts.txt
+Coverage calculated using bamstats amplicon counting method
+
+Key files:
+viralLoad.txt contains the estimated viral genomes present when IS was mixed with sample
+runQC.txt indicates how far the complexity capture deviated from expected.
+<prefix>-NT-R1.fastq or <prefix>-NT-R2.fastq are the viral reads, and should be compatible with your viral assembly pipeline. 
+
+The Other files:
+-IS-R1.fastq or -IS-R2.fastq are the IS reads  
+-bad-R1.fastq or -bad-R2.fastq are the recombinant reads 
+-IS.coverage, -cc.coverage, -NT.coverage, or -bad.coverage a table listing the reads for each amplicon, used for viral load.
+-tallies.txt a table indicating occurrences and position of recombinants
+-CC.txt table the source/quality of a samples CC sequences.
+-CC-counts.txt a summary table created from the CC.txt file.
+Bam and sam intermediate files used to create fastq and coverage.
+
+The code has room for optimization but we should settle on the final deliverable before moving to optimization.  Also, I’m a hacker, so I’m happy to hear of any suggestions for code improvements.
+
+Dependencies:
+bamstats04.jar
+https://github.com/mr-c/shouldacite/blob/master/should-I-cite-this-software.md
+
+bwa
+Li H. and Durbin R. (2009) Fast and accurate short read alignment with Burrows-Wheeler Transform. Bioinformatics, 25:1754-60
+
+samtools
+https://github.com/samtools/samtools
+
+remRecombo, coverage
+Tom Morrison, AccuGenomics.  tmorrison@accugenomics.com
+
+Version control
+9/22/20 - added ability to process ubam and added undeduped CC reads to runQC.txt.
+
