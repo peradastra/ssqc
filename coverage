@@ -19,7 +19,7 @@ fn=$(basename "$1")
 
 awk -v filestr=$fn -v fo="$2" 'FILENAME ~ /-NT.coverage$/ {
 	if (NR != 1 && $1=="MN908947.3") {
-		ar = int($9 / ( $3 - $2 ))
+		ar = int($9 / ( $3 - $2 ))#average reads per amplicon = total bases / expected fragment lenthg
 		na[nc++]=ar;nt+=ar
 	} else {next}
 }	

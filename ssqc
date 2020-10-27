@@ -107,7 +107,8 @@ if [[ ! "$line" =~ ^# ]];then
 				echo "bam to paired fastq..."
                 		if [ ! -f "${pi}/${fn}-R1.fastq.gz" ]; then
 					samtools sort -n "$line" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-                			samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -s "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
+                			samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -0 "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
+					[[ $(stat -c%s "${pi}/${fn}-R0.fastq.gz") -gt $(stat -c%s "${pi}/${fn}-R1.fastq.gz") ]] && { echo "Bad reads exceed good reads."; exit 1; }
 				fi
 				ip1="${pi}/${fn}-R1.fastq.gz"; ip2="${pi}/${fn}-R2.fastq.gz"
 			else
