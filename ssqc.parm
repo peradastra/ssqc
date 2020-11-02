@@ -1,9 +1,10 @@
 #comment
 paired-end	true
 multiple-lanes	false
-fastq-files	/NGS/USAF/200914/files1
+fastq-files	/NGS/sanger/200922/files
 is_input	1000
 cc_expected	200
-ref	./SARS-CoV_ISv0.3.1_seperate.fasta
-nt2is	./NT_IS_LOOKUP_TABLE_v0.3.1_seperate.txt
+ref	/NGS/USAF/code/SARS-CoV_ISv0.3.1_seperate.fasta
+nt2is	/NGS/USAF/code/NT_IS_LOOKUP_TABLE_v0.3.2_seperate.txt
+covBed	/NGS/USAF/code/VarDict-amplicon.v1.bed
 split	true	

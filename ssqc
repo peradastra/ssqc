@@ -146,11 +146,11 @@ if [[ ! "$line" =~ ^# ]];then
 		 bwa mem -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 
-echo "Removing Rcecombinants..."
-	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
-
-#	rm -f "${pi}/${fn}.bam"
-samtools index "${pi}/${fn}.bam"
+#echo "Removing Rcecombinants..."
+#	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
+#
+##	rm -f "${pi}/${fn}.bam"
+#samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
 
