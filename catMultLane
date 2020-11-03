@@ -1,0 +1,10 @@
+#!/bin/bash -e
+shopt -s extglob
+## input text file with path to filename root.
+while read -r val;do
+	po=$(dirname "$val")
+	po="$po/snaq"
+	fp=$(basename "$val")
+	 cat "${val}_L00"[1-4]"_R1_001_201023.fastq.gz" > "${po}/${fp}_R1.fastq.gz"
+	cat "${val}_L00"[1-4]"_R2_001_201023.fastq.gz" > "${po}/${fp}_R2.fastq.gz"
+done < "$1"

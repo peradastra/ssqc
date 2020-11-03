@@ -103,31 +103,30 @@ FILENAME==tempFile{
 			print $1 " cigar Term " cd " not recognized" > "/dev/stderr"
 		}
 	}
-	if ($3 ~ /-CC.[0-9]*$/) { #put && ! ntf if eliminating recombinant CC
-		if(!($1 in ccQname)) {
-			if ( $4 <= 443 && ($4 + length($10)) >= 442)	CCc++ #count reads, not both strands
-			ccQname[$1]=0
-		}
+	if ($3 ~ /-CC$/) { #put && ! ntf if eliminating recombinant CC
 		print $0 >> ccFile
-		t2 = 655 - $4 + 1
-		if (t2 >0 && t2 < length($10) && !($1 in CCc2)) { #ensures no double counting
-			CCc2[$1]=0
-
-			t1=substr(tmp,t2,10)
-			if(t1 ~/^T[AGTC]{8}G/) {
-				printf("%s\t%s\t%s\n", sampleName, "2", t1) > complexityFile
-			} else {
-				printf("%s\t%s\t%s\n", sampleName, "b", t1) > complexityFile
-			}
-		} else {
-			t2=433 - $4 +1 
-			if (t2 >0 && t2 < length($10) && !($1 in CCc1)) {
-				CCc1[$1]=0
+		if(!($1 in ccQname)) {
+			t2 = 655 - $4 + 1
+			if (t2 >0 && t2 + 9 < length(tmp) && !($1 in CCc2)) { #ensures no double counting
+				CCc2[$1]=0
+				ccQname[$1]=0
 				t1=substr(tmp,t2,10)
-				if (t1 ~/G[AGTC]{8}T/) {
-					printf("%s\t%s\t%s\n", sampleName, "1", t1) > complexityFile 
-                        	} else {
-					printf("%s\t%s\t%s\n", sampleName, "a", t1) > complexityFile
+				if(t1 ~/^T[AGTC]{8}G/) {
+					printf("%s\t%s\t%s\n", sampleName, "2", t1) > complexityFile
+				} else {
+					printf("%s\t%s\t%s\n", sampleName, "b", t1) > complexityFile
+				}
+			} else {
+				t2=433 - $4 +1 
+				if (t2 >0 && t2 + 9 < length(tmp) && !($1 in CCc1)) {
+					CCc1[$1]=0
+					ccQname[$1]=0
+					t1=substr(tmp,t2,10)
+					if (t1 ~/G[AGTC]{8}T/) {
+						printf("%s\t%s\t%s\n", sampleName, "1", t1) > complexityFile 
+                        		} else {
+						printf("%s\t%s\t%s\n", sampleName, "a", t1) > complexityFile
+					}
 				}
 			}
 		}
@@ -149,9 +148,9 @@ FILENAME==tempFile{
         	        print $0 > tempFile #create this file to hold good reads, circle back later to remove bad mate pair
         	}
 # Count pool1 or pool2 CC regions, must have mapq >4 and not recombinant
-        if (!(ntf) && $5 >= 4 && $3 ~ /nCov-19-5110-7100_20ABYFCP.0-SNAQ/ && $4 <= 443 && ($4 + length($10)) >= 452 && !($1 in ISc1)) ISc1[$1]=0   #contains cc domain
+        if (!(ntf) && $5 >= 4 && $3 ~ /nCov-19-5110-7127_20ABYFCP.0-SNAQ/ && $4 <= 443 && ($4 + length($10)) >= 452 && !($1 in ISc1)) ISc1[$1]=0   #contains cc domain
         if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5532 && ($4 + length($10)) >= 5541 && !($1 in NTc1)) NTc1[$1]=0  #contains cc domain
- 	if (!(ntf) && $5 >= 4 && $3 ~ /nCov-19-5110-7100_20ABYFCP.0-SNAQ/ && $4 <= 665 && ($4 + length($10)) >= 674 && !($1 in ISc2)) ISc2[$1]=0   #contains cc domain
+ 	if (!(ntf) && $5 >= 4 && $3 ~ /nCov-19-5110-7127_20ABYFCP.0-SNAQ/ && $4 <= 665 && ($4 + length($10)) >= 674 && !($1 in ISc2)) ISc2[$1]=0   #contains cc domain
 	if (!(ntf) && $5 >= 4 && $3=="MN908947.3" && $4 <= 5754 && ($4 + length($10)) >= 5763 && !($1 in NTc2)) NTc2[$1]=0  #contains cc domain
 	}
 }
@@ -180,20 +179,20 @@ echo "Creating fastq..."
 test1=$(samtools view -c -f 1 ${pi}/${fn}-good.sam)
 if [[ $test1 -ne 0 ]];then
 	if [ -f "${pi}/${fn}-good.sam" ];then	
-		samtools sort -n "${pi}/${fn}-good.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-NT-R1.fastq.gz" -2 "${pi}/${fn}-NT-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
+		samtools sort -n "${pi}/${fn}-good.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G >/dev/null 2>&1
+		samtools fastq --verbosity 3 -1 "${pi}/${fn}-NT-R1.fastq.gz" -2 "${pi}/${fn}-NT-R2.fastq.gz" "${pi}/${fn}-rsort.temp" &>/dev/null
 	fi
         if [ -f "${pi}/${fn}-IS.sam" ];then
-		samtools sort -n "${pi}/${fn}-IS.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-IS-R1.fastq.gz" -2 "${pi}/${fn}-IS-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
+		samtools sort -n "${pi}/${fn}-IS.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G >/dev/null 2>&1
+		samtools fastq --verbosity 3 -1 "${pi}/${fn}-IS-R1.fastq.gz" -2 "${pi}/${fn}-IS-R2.fastq.gz" "${pi}/${fn}-rsort.temp" &>/dev/null
 	fi
         if [ -f "${pi}/${fn}-bad.sam" ];then
-		samtools sort -n "${pi}/${fn}-bad.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-bad-R1.fastq.gz" -2 "${pi}/${fn}-bad-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
+		samtools sort -n "${pi}/${fn}-bad.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G >/dev/null 2>&1
+		samtools fastq --verbosity 3 -1 "${pi}/${fn}-bad-R1.fastq.gz" -2 "${pi}/${fn}-bad-R2.fastq.gz" "${pi}/${fn}-rsort.temp" &>/dev/null
 	fi
 	if [ -f "${pi}/${fn}-CC.sam" ];then
-		samtools sort -n "${pi}/${fn}-CC.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-		samtools fastq -1 "${pi}/${fn}-CC-R1.fastq.gz" -2 "${pi}/${fn}-CC-R2.fastq.gz" "${pi}/${fn}-rsort.temp"
+		samtools sort -n "${pi}/${fn}-CC.sam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G >/dev/null 2>&1
+		samtools fastq --verbosity 3 -1 "${pi}/${fn}-CC-R1.fastq.gz" -2 "${pi}/${fn}-CC-R2.fastq.gz" "${pi}/${fn}-rsort.temp" &>/dev/null
 	fi
 else
         if [ -f "${pi}/${fn}-good.sam" ];then

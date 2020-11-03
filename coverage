@@ -6,11 +6,20 @@
 
 fp=$(dirname "$1")
 fn=$(basename "$1")
+if [ ! -f "${1}-NT.coverage" ];then
+       samtools bedcov -Q 4 "$3" "${1}-good.bam" > "${1}-NT.coverage"
+       fi
+       
+if [ ! -f "${1}-IS.coverage" ];then
+       samtools bedcov -Q 4 "$3" "${1}-IS.bam" > "${1}-IS.coverage"
+       fi
 
-[ ! -f "${1}-NT.coverage" ] && samtools view -b -h -q 4 -m 220 "${1}-good.bam" | samtools bedcov "$3" - > "${1}-NT.coverage"
-[ ! -f "${1}-IS.coverage" ] && samtools view -b -h -q 4 -m 220 "${1}-IS.bam" | samtools bedcov "$3" - > "${1}-IS.coverage"
-[ ! -f "${1}-bad.coverage" ] && samtools view -b -h -q 4 -m 220 "${1}-bad.bam" | samtools bedcov "$3" - > "${1}-bad.coverage"
-[ ! -f "${1}-cc.coverage" ] && samtools view -b -h -q 4 -m 220 "${1}-cc.bam" | samtools bedcov "$3" - > "${1}-cc.coverage"
+if [ ! -f "${1}-bad.coverage" ];then
+       samtools bedcov -Q 4 "$3" "${1}-bad.bam" > "${1}-bad.coverage"
+fi
+if [ ! -f "${1}-cc.coverage" ];then
+	samtools bedcov -Q 4 "$3" "${1}-cc.bam" > "${1}-cc.coverage"
+fi
 
 #java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-good.bam" > "${1}-NT.coverage"
 #java -jar bamstats04.jar -B VarDict-amplicon.bed "${1}-IS.bam" > "${1}-IS.coverage"

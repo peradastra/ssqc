@@ -139,18 +139,18 @@ if [[ ! "$line" =~ ^# ]];then
 		[[ $fbam == 0 ]] && read -r ip2
  		if [ ! -f "${pi}/${fn}.bam" ];then
 			 echo "Paired end aligning..."
-		 	bwa mem -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" - 
+		 	bwa mem -v 1 -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" - 
 		fi	
 	elif [[ $fbam != 2 && ! -f "${pi}/${fn}.bam" ]] ;then
 		 echo "Single end aligning..."
-		 bwa mem -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
+		 bwa mem -v 1 -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 
-#echo "Removing Rcecombinants..."
-#	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
-#
-##	rm -f "${pi}/${fn}.bam"
-#samtools index "${pi}/${fn}.bam"
+echo "Removing Rcecombinants..."
+	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
+
+#	rm -f "${pi}/${fn}.bam"
+samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
 
