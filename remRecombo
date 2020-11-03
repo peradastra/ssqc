@@ -103,7 +103,7 @@ FILENAME==tempFile{
 			print $1 " cigar Term " cd " not recognized" > "/dev/stderr"
 		}
 	}
-	if ($3 ~ /-CC$/) { #put && ! ntf if eliminating recombinant CC
+	if ($3 ~ /-CC$/ || $3 ~ /-CC.[0-9]*$/ ) { #put && ! ntf if eliminating recombinant CC
 		print $0 >> ccFile
 		if(!($1 in ccQname)) {
 			t2 = 655 - $4 + 1
