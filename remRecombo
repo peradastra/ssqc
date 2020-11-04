@@ -232,7 +232,7 @@ FNR == last {
 	coverage=$1 "\t" $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6	
 }
 END {
-	print "SampleID\tTarget\tSequence\tCount\tNT_P1\tIS_P1\tCC_P2\tNT_P2\tIS_P2\tCC_P2" > outFile1
+	print "SampleID\tTarget\tSequence\tCount\tNT_P1\tIS_P1\tCC_P1\tNT_P2\tIS_P2\tCC_P2" > outFile1
 	print "SampleID\tTarget\tUniqueCount\tNT_P1\tIS_P1\tCC_P1\tNT_P2\tIS_P2\tCC_P2" > outFile2
 	for (key in uSEQ) {
 		print key "\t" uSEQ[key] "\t" coverage > outFile1
