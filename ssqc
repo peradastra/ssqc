@@ -134,23 +134,24 @@ if [[ ! "$line" =~ ^# ]];then
  	fi
 
 	#to do: handle concatenating <nameroot>_S[0-9]*__L00[1-4]_R[12]_001_<garbage>.fastq.gz (e.g., CTD2343_S164_L003_R1_001_200918.fastq.gz)
-	rg=$(printf '@RG\tID:%s\tSM:%s\tLB:NA\tPL:SNAQ' "$fn" "$fn")
+	rg="@RG\tID:$fn\tSM:$fn\tLB:NA\tPL:SNAQ"
+
 	if [[ $pe == 1 && $fbam != 2 ]];then
 		[[ $fbam == 0 ]] && read -r ip2
  		if [ ! -f "${pi}/${fn}.bam" ];then
 			 echo "Paired end aligning..."
-		 	bwa mem -v 1 -R $rg -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" - 
+			 bwa mem -v 1 -R $(echo $rg) -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" - 
 		fi	
 	elif [[ $fbam != 2 && ! -f "${pi}/${fn}.bam" ]] ;then
 		 echo "Single end aligning..."
-		 bwa mem -v 1 -R $rg -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
+		 bwa mem -v 1 -R $(echo $rg) -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
 	fi	
 
 echo "Removing Rcecombinants..."
-#	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
-#
-##	rm -f "${pi}/${fn}.bam"
-#samtools index "${pi}/${fn}.bam"
+	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
+
+#	rm -f "${pi}/${fn}.bam"
+samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
 
