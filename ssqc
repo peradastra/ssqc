@@ -57,19 +57,23 @@ while read -r val;do
                         exit 1
                 fi
         fi
-        if [[ "$val" =~ ^split ]];then
-                if [[ "$val" =~ true$ ]];then
-                        splitSeq=1
-                else
-                        splitSeq=0
-                fi
+        if [[ "$val" =~ ^qScore ]];then
+        	tmp="$(cut -f2 <<< "$val")"
+		tmp=$(($tmp + 33))	
+		qCutoff=$(printf \\$(printf '%03o' $tmp))
+	fi
+	if [[ "$val" =~ ^goodBaseChange ]];then
+			gbc="$(cut -f2 <<< "$val")"
         fi
+
 
 done < "$1"
 if [ -z "$covBed" ]; then echo "Missing bed Coverage path"; exit 1; fi
 if [ -z "$ref" ]; then echo "Missing reference genome path"; exit 1; fi
 if [ -z "$nt2is" ]; then echo "Missing NT to IS mapping table"; exit 1; fi
 if [ -z "$input" ]; then echo "Missing list of fasta file path"; exit 1; fi
+if [ -z "$qCutoff" ]; then echo "Missing Q score cutoff for base change position"; exit 1; fi
+if [ -z "$gbc" ]; then echo "Missing required >= number of base change positions per insert"; exit 1; fi
 
 sdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -97,9 +101,10 @@ if [[ ! "$line" =~ ^# ]];then
 		fn=${fp%.bam}; fe="fastq.gz"
 		
 		if $( samtools view -H "$line" | grep -q "$refBN" ); then
-			#aligned bam
-			ln -f "$line" "$pi"
+			#aligned bam to correct modified reference
+			#ln -f "$line" "$pi"
 			fbam=2
+			samtools view -h "$line" > "${pi}/${fn}.sam" #convert to sam to simplify AWK analysis
 			echo "Skipping alignment..."
 		else
 			fbam=1
@@ -138,19 +143,20 @@ if [[ ! "$line" =~ ^# ]];then
 
 	if [[ $pe == 1 && $fbam != 2 ]];then
 		[[ $fbam == 0 ]] && read -r ip2
- 		if [ ! -f "${pi}/${fn}.bam" ];then
+ 		if [ ! -f "${pi}/${fn}.sam" ];then
 			 echo "Paired end aligning..."
-			 bwa mem -v 1 -R $(echo $rg) -t 32 $ref "$ip1" "$ip2" | samtools sort -@1G -o "${pi}/${fn}.bam" - 
+			 bwa mem -v 1 -R $(echo $rg) -t 32 $ref "$ip1" "$ip2" | samtools sort -@ 16 -m 1G -o "${pi}/${fn}.sam" - 
 		fi	
-	elif [[ $fbam != 2 && ! -f "${pi}/${fn}.bam" ]] ;then
+	elif [[ $fbam != 2 && ! -f "${pi}/${fn}.sam" ]] ;then
 		 echo "Single end aligning..."
-		 bwa mem -v 1 -R $(echo $rg) -t 32 $ref "$ip1" | samtools sort -@1G -o "${pi}/${fn}.bam" -
+		 bwa mem -v 1 -R $(echo $rg) -t 32 $ref "$ip1" | samtools sort -@ 16 -m 1G -o "${pi}/${fn}.sam" -
 	fi	
 
 echo "Removing Rcecombinants..."
-	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.bam" $splitSeq "$sdir"
+	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.sam" $qCutoff $gbc 
 
 #	rm -f "${pi}/${fn}.bam"
+samtools view -b1h  "${pi}/${fn}.sam" -o "${pi}/${fn}.bam"
 samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
