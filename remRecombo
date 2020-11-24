@@ -1,22 +1,21 @@
 #!/bin/bash -e
 
-##usage: remRecombo <lookupTable> <sam> <qScore> <gbc>
+##usage: remRecombo <lookupTable> <sam> <qScore> <gbc> <PE>
 ## <lookupTable> file path to lookup table (see comment below)
 ## <sam> file path to sam file (not bam because script uses two cycles through file)
-## <qScore> minimum qscore a base change position must have to be accepted
+## <qScore> minimum qscore a base change position must have to be accepted (zero will skip test and script will run faster)
 ## <gbc> number of base change positions required per insert
-##
+## <PE> 0 SE, 2 PE sequence
 ## For SNAQ analysis requiring reads containing both control and native sequences.
-## Create bad and good read file place-holders with bam header,
+## two passes through SAM, first to ID bins for reads, second pass to sort,
 ## awk Import NT IS lookup table, create recombinant hash table RefName : POS : base, where base is switched between IS and NT
-##    Use cigar for each read and look at each position to see if found in hash (if yes, it's a recombinate or unfortunate NGS error/mutant,
-##    add QName to badQname table and read added to bad.sam; else read added to tempFile
-##    After samtools view input done, test each queryName in tempFile exists in badQname table, if yes move read to bad.sam; else add to good.sam
+##    Use cigar for each read and look at each position to see if found in hash, if base indicates recombo between NT and IS,
+##    place qname:chrom:pos++ in badQname (recombination), or ISQname or NTQname if base reference (a qScore test determines if added base accepterd)
+##    After first pass sort into bins based on Qname hashes
 ##Complexity Control extraction.  If RefName contains CC, hard coded position extracted into a file: SampleID matchQuality/PoolID Sequence.
 ##		a or b indicates bad CC from pool1 or pool2, other wise 1 or 2 indicates CC sequence passed QC and indicates it source.
 ##	CC QC uses the bases flanking the Ns to ensure alignment was correct.
 ##	NT and IS CC-regions counted to allow for future relative yield calculations.
-##splitSeq boolean indicates if the NT and IS should be split to create separated FASTQ
 ##Clean up: covert sam to bam, index, create fastq, tabulate CC results
 ## Version:
 ##	0.1 First release, uses concatenated IS
@@ -24,7 +23,9 @@
 ##	0.3 Add single read support, count CC region in NT, IS, and CC, for
 ##		reads indicate if bad match to pool 1 =a and pool 2 =b, move CC to their own bam
 ##	0.4 A good IS or NT read requires n base change positions with qscore > x; removed splitSeq boolean.
-## For Support: tmorrison@accuGenomics.com
+## 	0.5 Create new ukn bin to handle inserts w/o bc position.  Attempt to address suplemental alignments, 
+##		PE chimeras, require good bc position SE or PE seq, SAM file input due to two pass,   
+##For Support: tmorrison@accuGenomics.com
 
 pi=$(dirname "${2}")
 fp=$(basename "$2")
@@ -58,7 +59,7 @@ BEGIN {
 FNR==1{
 	FNUM++
 }
-FNUM==1{
+FNUM==1{ #process lookup table
 	if(NR==1 && ($1 != "NT_CHROM" || $2 != "NT_POS" || $3 != "NT_REF" || $4 != "IS_CHROM" || $5 != "IS_POS" || $6 != "IS_REF" )) {
 		print "ERROR: NT-IS lookup file header incorrect" > "/dev/stderr"
 		print $1 "\t" $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6 > "/dev/stderr"
@@ -73,28 +74,26 @@ FNUM==1{
 	next
 }
 FNUM==3 && !/^@/ {
-	##sort the sam into NT, IS, CC, REComination, UNKnown
-	found=0
+	## Capture CC info and sort read into NT, IS, CC, REComination, UNKnown bin
+	if ($1=="A00968:141:HT3L7DRXX:2:2267:26033:20494"){print $0 > "/dev/stderr"}
 	if($1 ":" $3 ":" $4 in ccQname){
-		found=1
 		print $0 >> ccFile #Complexity controls
-	}
-	if($1 ":" $3 ":" $4 in badQname && ! found){ #IS or NT read with a base change indicating recombination
-		found=1
+	} else if($1 ":" $3 ":" $4 in badQname ){ #IS or NT read with a base change indicating recombination
+		 if ($1=="A00968:141:HT3L7DRXX:2:2267:26033:20494"){print $0 "recombo" > "/dev/stderr"}
 		print $0 >> badFile #this will ensure R2, which could be recombo, does not end up in good bam
-	} 
-	if (ISQname[$1 ":" $3 ":" $4] >= gbc && ! found) {
-		found=1
-		if ($3 ~ /nCov-19-5110-7127_20ABYFCP.0-SNAQ/ && $4 <= 443 && ($4 + length($10)) >= 452 && !($1 in ISc1)) {
+	} else if ($7 ~ !/^[=\*]/  && $7 != $3){
+		if ($1=="A00968:141:HT3L7DRXX:2:2267:26033:20494"){print $0 "PE mismatch" > "/dev/stderr"}
+		print $0 >> badFile #this read pair is a chimera is a recobinant assumes NT is single reference genome contig
+	} else if ( (ISQname[$1 ":" $3 ":" $4] + ISQname[$1 ":" $7 ":" $8]) >= gbc) { #sum of base change positions in read pairs
+		 if ($1=="A00968:141:HT3L7DRXX:2:2267:26033:20494"){print $0 "how slipped through?" > "/dev/stderr"}
+			if ($3 ~ /nCov-19-5110-7127_20ABYFCP.0-SNAQ/ && $4 <= 443 && ($4 + length($10)) >= 452 && !($1 in ISc1)) {
 			ISc1[$1]=0 #cc region
 		} 
 		else if ($3 ~ /nCov-19-5110-7127_20ABYFCP.0-SNAQ/ && $4 <= 665 && ($4 + length($10)) >= 674 && !($1 in ISc2)) {
 			ISc2[$1]=0
 		}
 		print $0 >> isFile #IS sequence with at least gbc number of base change postions
-	} 
-       	if (NTQname[$1 ":" $3 ":" $4] >= gbc && ! found) {
-		found=1
+	} else if ( (NTQname[$1 ":" $3 ":" $4] + NTQname[$1 ":" $7 ":" $8]) >= gbc) {
 		if ($3=="MN908947.3" && $4 <= 5532 && ($4 + length($10)) >= 5541 && !($1 in NTc1)) {
 			NTc1[$1]=0
 		} 
@@ -102,8 +101,7 @@ FNUM==3 && !/^@/ {
 			NTc2[$1]=0
 		}
 		print $0 >> goodFile #NT sequences with at least gbc number of base change positions
-	} 
-	if (found == 0 ) {
+	} else {
 		print $0 >> unkFile #read does not have base change position with sufficient qscore
 	}
 	next
@@ -122,16 +120,16 @@ FNUM==3 && !/^@/ {
 		}
 		else if (cd=="D" || cd=="N"){
 			tmp=substr(tmp,1,pnt) substr(xs,1,nm) substr(tmp,pnt+1,length(tmp)) 
-			tmpq=substr(tmpq,1,pnt) substr(xs,1,nm) substr(tmpq,pnt+1,length(tmpq))
+			if (qCutoff) {tmpq=substr(tmpq,1,pnt) substr(xs,1,nm) substr(tmpq,pnt+1,length(tmpq))}
 			pnt=pnt+nm 
 		}
 		else if (cd=="I"){
 	                tmp=substr(tmp,1,pnt) substr(tmp,pnt+nm+1,length(tmp)-nm-pnt )
-			tmpq=substr(tmpq,1,pnt) substr(tmpq,pnt+nm+1,length(tmpq)-nm-pnt )
+			if (qCutoff) {tmpq=substr(tmpq,1,pnt) substr(tmpq,pnt+nm+1,length(tmpq)-nm-pnt )}
 		}	
        	        else if (cd=="S"){
 	                tmp=substr(tmp,1,pnt) substr(tmp,pnt+nm+1,length(tmp)-nm-pnt )
-			tmpq=substr(tmpq,1,pnt) substr(tmpq,pnt+nm+1,length(tmpq)-nm-pnt ) 
+			if (qCutoff) {tmpq=substr(tmpq,1,pnt) substr(tmpq,pnt+nm+1,length(tmpq)-nm-pnt )} 
        	        }
 		else if (cd=="H" || cd=="P"){
 		}
@@ -141,13 +139,13 @@ FNUM==3 && !/^@/ {
 		}
 	}
 	if ($3 ~ /-CC$/ || $3 ~ /-CC.[0-9]*$/ ) { #put && ! ntf if eliminating recombinant CC
-		#print $0 >> ccFile
-		if(!($1 in ccQname)) {
+		if(!($1 ":" $3 ":" $4 in ccQname)) {
 			t2 = 655 - $4 + 1
 			if (t2 >0 && t2 + 9 < length(tmp) && !($1 in CCc2)) { #ensures no double counting
 				CCc2[$1]=0
 				ccQname[$1 ":" $3 ":" $4]=0
-				t1=substr(tmp,t2,10)
+				if ($7 ~ !/[\*=]/) {ccQname[$1 ":" $7 ":" $8]=0} #captured paired read too
+				t1=substr(tmp,t210)
 				if(t1 ~/^T[AGTC]{8}G/) {
 					printf("%s\t%s\t%s\n", sampleName, "2", t1) > complexityFile
 				} else {
@@ -158,6 +156,7 @@ FNUM==3 && !/^@/ {
 				if (t2 >0 && t2 + 9 < length(tmp) && !($1 in CCc1)) {
 					CCc1[$1]=0
 					ccQname[$1 ":" $3 ":" $4]=0
+					if ($7 ~ !/[\*=]/) {ccQname[$1 ":" $7 ":" $8]=0} #capture paired read too
 					t1=substr(tmp,t2,10)
 					if (t1 ~/G[AGTC]{8}T/) {
 						printf("%s\t%s\t%s\n", sampleName, "1", t1) > complexityFile 
@@ -169,18 +168,26 @@ FNUM==3 && !/^@/ {
 		}
 	} else {
 		ntf=0
+		qPass=1 #if qCutoff=0, this will bipass qscore test
 		n=split(tmp,a,"")
-        	split(tmpq,aq,"")
+		if (qCutoff) {split(tmpq,aq,"")} #only needed if qScore test is implemented
 		for (i=1;i<=n;i++){
-			if ($3 ":" $4+i-1 in NTs && aq[i] >= qCutoff){ #Basechange position and good qscore
-				if (NTs[$3 ":" $4+i-1] == a[i]){ #base suggests recombination
-					badQname[$1 ":" $3 ":" $4]++
-					ntf=1
-					recPos[$3 ":" $4+i-1 ":" NTs[$3 ":" $4+i-1]]++ #track recombinant position
-				} else if ($3 ~ /-SNAQ$/ && ISs[$3 ":" $4+i-1] == a[i]) {
-					ISQname[$1":" $3 ":" $4]++
+			if (qCutoff) { 
+				if (aq[i] >= qCutoff) {
+					qPass=1
+				} else {
+					qPass=0
+				} 
+			}
+			if ($3 ":" $4+i-1 in NTs && qPass){ #Basechange position with passing qscore otherwise not interested in POS
+				if (NTs[$3 ":" $4+i-1] == a[i]){ #base match indicates recombination
+					badQname[$1 ":" $3 ":" $4]++ #QNAME : CHROM : POS -- each aligned read is tracked
+					recPos[$3 ":" $4+i-1 ":" NTs[$3 ":" $4+i-1]]++ #track recombinant position (possible future use)
+					if ($7 ~ !/[\*=]/) {badQname[$1 ":" $7 ":" $8]++} #paired end marked as possible recombinant too
+				} else if ($3 ~ /-SNAQ$/ && ISs[$3 ":" $4+i-1] == a[i]) { #count expected ref base
+					ISQname[$1 ":" $3 ":" $4]++
 				} else if (ISs[$3 ":" $4+i-1] == a[i]){
-					NTQname[$1 ":" $3 ":" $4]++ #make sure each read has a basechange position of good quality
+					NTQname[$1 ":" $3 ":" $4]++
 				}
 			}
         	        
@@ -212,8 +219,7 @@ samtools index "${pi}/${fn}-ukn.bam"
 rm -f "${pi}/${fn}-ukn.sam"
 
 echo "Creating fastq..."
-test1=$(samtools view -c -f 1 ${pi}/${fn}-good.bam)
-if [[ $test1 -ne 0 ]];then
+if [[ $5=1 ]];then
 	if [ -f "${pi}/${fn}-good.bam" ];then	
 		samtools sort -n "${pi}/${fn}-good.bam" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G >/dev/null 2>&1
 		samtools fastq --verbosity 3 -1 "${pi}/${fn}-NT-R1.fastq.gz" -2 "${pi}/${fn}-NT-R2.fastq.gz" "${pi}/${fn}-rsort.temp" &>/dev/null

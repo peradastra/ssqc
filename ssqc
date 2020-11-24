@@ -112,7 +112,7 @@ if [[ ! "$line" =~ ^# ]];then
 				echo "bam to paired fastq..."
                 		if [ ! -f "${pi}/${fn}-R1.fastq.gz" ]; then
 					samtools sort -n "$line" -o "${pi}/${fn}-rsort.temp" -O bam -@ 32 -m 1G
-                			samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -0 "${pi}/${fn}-R0.fastq.gz" "${pi}/${fn}-rsort.temp"
+                			samtools fastq -1 "${pi}/${fn}-R1.fastq.gz" -2 "${pi}/${fn}-R2.fastq.gz" -0 "${pi}/${fn}-R0.fastq.gz" -s "${pi}/${fn}-singles.fastq.gz" "${pi}/${fn}-rsort.temp"
 					[[ $(stat -c%s "${pi}/${fn}-R0.fastq.gz") -gt $(stat -c%s "${pi}/${fn}-R1.fastq.gz") ]] && { echo "Bad reads exceed good reads."; exit 1; }
 				fi
 				ip1="${pi}/${fn}-R1.fastq.gz"; ip2="${pi}/${fn}-R2.fastq.gz"
@@ -153,7 +153,7 @@ if [[ ! "$line" =~ ^# ]];then
 	fi	
 
 echo "Removing Rcecombinants..."
-	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.sam" $qCutoff $gbc 
+	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.sam" $qCutoff $gbc $pe 
 
 #	rm -f "${pi}/${fn}.bam"
 samtools view -b1h  "${pi}/${fn}.sam" -o "${pi}/${fn}.bam"
@@ -161,10 +161,10 @@ samtools index "${pi}/${fn}.bam"
 
 	rm -f "${pi}/${fn}-rsort.temp"
 
-	echo "Coverage..."
+echo "Coverage..."
 	"$sdir/coverage" "${pi}/${fn}" "$coverage" "$covBed"
 
-	echo "CC QC..."
+echo "CC QC..."
 	awk -v output="$runQC" -v cc_expected=$cc_expected -v is_input=$is_input '{if($2 == 1) {
 		printf "%s\t%s\t%i\t%i\t%i\t%i", $1, "1",$4,$5,$6,$3 >> output
                 if($5+$4==0){printf "\t%s\n", "ND" >> output} else {printf "\t%f\n",($5/($5+$4)*$3)/cc_expected >> output}
@@ -172,7 +172,7 @@ samtools index "${pi}/${fn}.bam"
 		printf "%s\t%s\t%i\t%i\t%i\t%i", $1, "2",$7,$8,$9,$3 >> output
                 if($7+$8==0){printf "\t%s\n", "ND" >> output} else {printf "\t%f\n",($8/($8+$7)*$3)/cc_expected >> output}
 	#old viral load calc if($5==0){printf "\t%s\n", "ND" >> output} else {printf "\t%i\n" , $4/$5*is_input >> output}
-	}}' "${pi}/${fn}.bam_CC-read-counts.txt"
+	}}' "${pi}/${fn}.sam_CC-read-counts.txt"
 	
 #rm -f "${pi}/${fn}.bam_CC-read-counts.txt"
 
