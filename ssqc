@@ -65,7 +65,13 @@ while read -r val;do
 	if [[ "$val" =~ ^goodBaseChange ]];then
 			gbc="$(cut -f2 <<< "$val")"
         fi
-
+        if [[ "$val" =~ ^seqSplit ]];then
+                if [[ "$val" =~ true$ ]];then
+                        seqSplit=1
+                else
+                        seqSplit=0
+                fi
+	fi
 
 done < "$1"
 if [ -z "$covBed" ]; then echo "Missing bed Coverage path"; exit 1; fi
@@ -74,6 +80,7 @@ if [ -z "$nt2is" ]; then echo "Missing NT to IS mapping table"; exit 1; fi
 if [ -z "$input" ]; then echo "Missing list of fasta file path"; exit 1; fi
 if [ -z "$qCutoff" ]; then echo "Missing Q score cutoff for base change position"; exit 1; fi
 if [ -z "$gbc" ]; then echo "Missing required >= number of base change positions per insert"; exit 1; fi
+if [ -z "$seqSplit" ]; then echo "Missing request to split sequences, assuming no"; seqSplit=0; fi
 
 sdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -153,17 +160,21 @@ if [[ ! "$line" =~ ^# ]];then
 	fi	
 
 echo "Removing Rcecombinants..."
-	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.sam" $qCutoff $gbc $pe 
+	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.sam" $qCutoff $gbc $pe $seqSplit
 
-#	rm -f "${pi}/${fn}.bam"
-samtools view -b1h  "${pi}/${fn}.sam" -o "${pi}/${fn}.bam"
-samtools index "${pi}/${fn}.bam"
-
+#if [[ $seqSplit -ne 0 ]];then
+	#	rm -f "${pi}/${fn}.bam"
+	samtools view -b1h  "${pi}/${fn}.sam" -o "${pi}/${fn}.bam"
+	samtools index "${pi}/${fn}.bam"
 	rm -f "${pi}/${fn}-rsort.temp"
+#fi
 
 echo "Coverage..."
-	"$sdir/coverage" "${pi}/${fn}" "$coverage" "$covBed"
-
+#	if [[ $seqSplit -ne 0 ]];then
+		"$sdir/coverage" "${pi}/${fn}" "$coverage" "$covBed" $seqSplit
+#	else
+#		echo "WRITE CODE TO MEASURE COVERAGE WITH UNSPLIT FILES"
+#	fi
 echo "CC QC..."
 	awk -v output="$runQC" -v cc_expected=$cc_expected -v is_input=$is_input '{if($2 == 1) {
 		printf "%s\t%s\t%i\t%i\t%i\t%i", $1, "1",$4,$5,$6,$3 >> output
