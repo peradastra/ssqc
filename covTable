@@ -1,0 +1,27 @@
+#!/bin/bash -e
+## covTable <path/to/fileList>
+## extracts amplicon name and samtools bedcov reads from list of .coverage files created by ssqc and pointed to by 
+## fileList
+
+while read -r val;do
+        po=$(dirname "$val")
+        po="$po/snaq"
+        fp=$(basename "$val")
+	fn=${fp%.*}
+	covTable="${po}/covTable.txt"
+
+if [[ -f "$po/$fn-ukn.coverage" ]];then
+	awk -v covTable="$covTable" ' 
+	FNR=1 {match(FILENAME, /^.*\/(.*)-([A-z]*)\.coverage$/, arr); fileInfo=arr[1]"\t"arr[2]"\t"}
+	{print fileInfo$4"\t"$9 >> covTable}
+	' "$po/$fn-ukn.coverage" "$po/$fn-bad.coverage" "$po/$fn-IS.coverage" "$po/$fn-NT.coverage"
+else
+        awk -v covTable="$covTable" '
+        FNR=1 {match(FILENAME, /^.*\/(.*).coverage$/, arr); fileInfo=arr[1]"\t"}
+        {print fileInfo$4 "\t" $1  "\t" $9 >> covTable}
+        ' "$po/$fn.coverage" 
+
+fi
+
+done < "$1"
+

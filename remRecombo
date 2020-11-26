@@ -44,14 +44,19 @@ unkFile="${pi}/${fn}-ukn.sam"
 hashTallies="${pi}/${fn}-tallies.txt"
 tempFile="${pi}/tempFile.sam"
 
-echo "Preparing ${pi}/${fn}.${fe}..."
-samtools view -H "${pi}/${fn}.${fe}" > $goodFile
-cp $goodFile $badFile
-cp $goodFile $ccFile
-cp $goodFile $isFile
-cp $goodFile $unkFile
-
-echo "Removing recombinants & calculating CC..."
+if [[ $6 -eq 1 ]];then
+	echo "Preparing ${pi}/${fn}.${fe}..."
+	samtools view -H "${pi}/${fn}.${fe}" > $goodFile
+	cp $goodFile $badFile
+	cp $goodFile $ccFile
+	cp $goodFile $isFile
+	cp $goodFile $unkFile
+	awkCmd=""
+	awkInput="$1 ${pi}/${fn}.${fe} ${pi}/${fn}.${fe}"
+else
+	awkInput="$1 -"
+	awkCmd="samtools view ${pi}/${fn}.bam | "
+fi
 awk -v badFile="$badFile" -v ccFile="$ccFile" -v unkFile="$unkFile" -v goodFile="$goodFile" -v hashTallies="$hashTallies" -v complexityFile="$complexityFile" -v sampleName="$fn" -v isFile="$isFile" -v qCutoff="$3" -v gbc="$4" -v seqSplit="$6" ' 
 BEGIN {
 	xs="!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"

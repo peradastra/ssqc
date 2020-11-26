@@ -1,0 +1,76 @@
+#!/bin/bash -e
+##coverage </path/rootFileName> <path/to/run/coverage/output/file> <seqSplit>
+## <seqSplit> indicates if the sequneces were split into part, false, just count SNAQ and NM and marks chimeras as recombinants
+## To Do: Modify samtools view filters to eliminate possible garbage sequences.
+## 	Add simple count of split sequences
+
+fp=$(dirname "$1")
+fn=$(basename "$1")
+if [[ $3 -ne 0 ]];then
+	echo "simple contig count of split files not implement yet"
+	exit 1
+	#if [ ! -f "${1}-NT.coverage" ];then
+	#       samtools bedcov -Q 4 "$3" "${1}-good.bam" > "${1}-NT.coverage"
+	#       fi
+	#       
+	#if [ ! -f "${1}-IS.coverage" ];then
+	#       samtools bedcov -Q 4 "$3" "${1}-IS.bam" > "${1}-IS.coverage"
+	#       fi
+	#
+	#if [ ! -f "${1}-bad.coverage" ];then
+	#       samtools bedcov -Q 4 "$3" "${1}-bad.bam" > "${1}-bad.coverage"
+	#fi
+	#if [ ! -f "${1}-cc.coverage" ];then
+	#	samtools bedcov -Q 4 "$3" "${1}-cc.bam" > "${1}-cc.coverage"
+	#fi
+	#if [ ! -f "${1}-ukn.coverage" ];then
+	#        samtools bedcov -Q 4 "$3" "${1}-ukn.bam" > "${1}-ukn.coverage"
+	#fi
+
+	#awk -v filestr=$fn -v fo="$2" '
+	#FILENAME ~ /-NT.coverage$/ {
+	#	if ($1=="MN908947.3") {
+	#		ar = int($9 / ( $3 - $2 ))#average reads per amplicon = total bases / expected fragment lenthg
+	#		na[nc++]=ar;nt+=ar
+	#	} else {next}
+	#}	
+	#FILENAME ~ /-IS.coverage$/ {
+	#	if ($1 ~ /-SNAQ$/) {
+	#		ar = int($9/($3 -$2))
+	#		 ia[ic++]=ar;it+=ar
+	#	} else {next}
+	#}
+	#FILENAME ~ /-ukn.coverage$/ {
+	#        if ($1 ~ /-SNAQ$/) {
+	#                ar = int($9/($3 -$2))
+	#                 ia[ic++]=ar;it+=ar
+	#        } else {next}
+	#}
+	#FILENAME ~ /-bad.coverage$/ {
+	#	ar = int($9/($3 -$2))
+	#	ba[bc++]=ar;bt+=ar
+	#}END {printf ("%s\t%i\t%i\t%i\t", filestr, nt, it, bt) >> fo
+	#	asort(na);asort (ia);asort (ib)
+	#	if ((nc % 2) == 1){nm=na[ int(nc/2) ]} else {nm=( na[nc/2] + na[nc/2-1])/2};
+	#	if ((ic % 2) == 1){im=ia[ int(ic/2) ]} else {im=( ia[ic/2] + ia[ic/2-1])/2};
+	#	if ((bc % 2) == 1){bm=ba[ int(bc/2) ]} else {bm=( ba[bc/2] + ba[bc/2-1])/2};
+	#	 printf ("%i\t%i\t%i\n", nm, im, bm ) >> fo
+	#}' "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage" "${1}-ukn.coverage"
+	#
+	##clean up
+	##rm -f "${1}-good.bam" "${1}-IS.bam" "${1}-bad.bam" "${1}-cc.bam"
+	##rm -f "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage" "${1}-cc.coverage"
+elif [ ! -f "${1}.coverage" ];then
+	samtools view "${1}.bam" | awk -v filestr=$fn -v fo="$2" '{
+		if ($7!="=" && $7!=$3){
+	               rt++
+		} else if ($3 ~ /-SNAQ$/) {
+                        is++
+                } else {
+			nt++	
+		}
+	} END {
+		printf ("%s\t%i\t%i\t%i\t", filestr, nt, is, rt) >> fo
+		printf ("%s\n", "NA\tNA\tNA" ) >> fo
+	}' -
+fi
