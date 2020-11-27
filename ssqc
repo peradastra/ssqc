@@ -119,7 +119,9 @@ if [[ ! "$line" =~ ^# ]];then
 			#aligned bam to correct modified reference
 			#ln -f "$line" "$pi"
 			fbam=2
-			samtools view -h "$line" > "${pi}/${fn}.sam" #convert to sam to simplify AWK analysis
+			if [ ! -f "${pi}/${fn}.sam" ]; then
+				samtools view -h "$line" > "${pi}/${fn}.sam" #convert to sam to simplify AWK analysis
+			fi
 			echo "Skipping alignment..."
 		else
 			fbam=1
@@ -168,9 +170,11 @@ if [[ ! "$line" =~ ^# ]];then
 	fi	
 
 echo "CC counting..."
+if [ ! -f "${pi}/${fn}-CC-counts.txt" ];then
 	"$sdir/remRecombo" "$nt2is" "${pi}/${fn}.sam" $qCutoff $gbc $pe $seqSplit
+fi
 
-if [[ $fbam!=2 ]];then
+if [[ $fbam!=2 && ! -f "${pi}/${fn}.bam" ]];then
 	samtools view -b1h  "${pi}/${fn}.sam" -o "${pi}/${fn}.bam"
 	samtools index "${pi}/${fn}.bam"
 	rm -f "${pi}/${fn}-rsort.temp"
@@ -207,7 +211,7 @@ awk -v is_input=$is_input -v vl="$viralLoad" 'FNR==1 {next}
 	if ($3+$4==0) {
                 vlr="ND"
         } else {
-                vlr=( $2 + ($4 / 2) )/($3 + ($4 / 2) ) * is_input
+                vlr= ( $2 / $3 ) * is_input
         }
         printf "%s\t%i\t%i\t%i\t%i\t%.1f\n", $1, $2 , $3 , $4 , is_input , vlr >> vl
 }' "$coverage"

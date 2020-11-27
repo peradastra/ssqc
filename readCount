@@ -61,8 +61,8 @@ if [[ $3 -ne 0 ]];then
 	##rm -f "${1}-good.bam" "${1}-IS.bam" "${1}-bad.bam" "${1}-cc.bam"
 	##rm -f "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage" "${1}-cc.coverage"
 elif [ ! -f "${1}.coverage" ];then
-	samtools view "${1}.bam" | awk -v filestr=$fn -v fo="$2" '{
-		if ($7!="=" && $7!=$3){
+	samtools view -q 8 -m 100 "${1}.bam" | awk -v filestr=$fn -v fo="$2" '{
+		if ($3 != $7 && $7 !~ /=/){
 	               rt++
 		} else if ($3 ~ /-SNAQ$/) {
                         is++

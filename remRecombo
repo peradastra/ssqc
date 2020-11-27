@@ -51,12 +51,10 @@ if [[ $6 -eq 1 ]];then
 	cp $goodFile $ccFile
 	cp $goodFile $isFile
 	cp $goodFile $unkFile
-	awkCmd=""
-	awkInput="$1 ${pi}/${fn}.${fe} ${pi}/${fn}.${fe}"
-else
-	awkInput="$1 -"
-	awkCmd="samtools view ${pi}/${fn}.bam | "
 fi
+##the awk script uses sam file when two passes needed when splitting sequence
+##If no splitting, one can change the script to take a bam file (i.e., don't need to make a sam file) by samtools view -h <bam> | awk '....' $1 -
+##Further, if CC counting only, the FNR==1 & FNUM==1 & FNUM==3 can be removed and file input reduced to just awk '....' -
 awk -v badFile="$badFile" -v ccFile="$ccFile" -v unkFile="$unkFile" -v goodFile="$goodFile" -v hashTallies="$hashTallies" -v complexityFile="$complexityFile" -v sampleName="$fn" -v isFile="$isFile" -v qCutoff="$3" -v gbc="$4" -v seqSplit="$6" ' 
 BEGIN {
 	xs="!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
