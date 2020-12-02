@@ -1,13 +1,18 @@
 #!/bin/bash -e
 ## ssqc <path/to/parm.file>
 ## parm.file: 
-##   paired-end	true or false if sequence is paired end (note: collaps samples that cross lanes e.g., cat <name-L00[1-4]-R1.fastq.gz > name-R1.fastq.gz)
-##   fastq-files	</path/to/file> contains a list of fastq.gz files, paired ends alternate with naming convension name-R1.fastq.gz and name-R2.fastq.gz
-##   is_input	<integer> copies of internal standard added to sample.
-##   cc_expected	<integer> determined after several runs..expected count of unique CC sequences when no significant NT competition.
-##   nt2is </path/to/file> contains the mapping of NT to IS, base changes in lowercase
-##   ref </path/to/files> path to the reference genome
-##   split <true/false> determine if the NT and IS reads are to divided into separate bam and fastq
+#  paired-end true or false if sequence is paired end (note: collaps samples that cross lanes e.g., cat <name-L00[1-4]-R1.fastq.gz > name-R1.fastq.gz)
+#  fastq-files </path/to/file> contains a list of fastq.gz files, paired ends alternate with naming convension name-R1.fastq.gz and name-R2.fastq.gz
+#  is_input <integer> copies of internal standard added to sample.
+#  cc_expected <integer> determined after several runs..expected count of unique CC sequences when no significant NT competition.
+#  nt2is </path/to/file> contains the mapping of NT to IS, base changes in lowercase
+#  ref </path/to/files> path to the reference genome
+#  seqSplit <true/false> determine if the NT and IS reads are to divided into separate bam and fastq
+#  multiple-lanes true or false Not implemented. Script does not handle illumina 4 lane fastq.  Use catMultLane to concatenate lanes
+#  qScore <integer> Sorting reads into NT, IS, REC, CC, &  ukn bins uses base change position, to use position for splitting qScore must be at or above (zero ignores)
+#  goodBaseChange <integer> Number of base change positions required for sorting, otherwise ends up in ukn bin
+#  calcCov true or false generate coverage table to be used for viral load, otherwise use NT and IS read counts
+#  covBed </path/to/file> table used by samtools bedcov for coverage analysis, also doubles as a region filter
 ##
 ## Program flow: read parameters; align reads; call remRecombinants; calculate coverage; create runQC table; calculate viral load
 ## viral load calculated from total amplicon reads (NT + recombinants/2) / (IS + recombinant/2) * IS_INPUT

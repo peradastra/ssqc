@@ -10,4 +10,4 @@ seqSplit	false
 calcCov	false
 ref	/NGS/USAF/code/SARS-CoV_ISv0.4.1_seperate.fasta
 nt2is	/NGS/USAF/code/NT_IS_LOOKUP_TABLE_v0.4.2_seperate.txt
-covBed	/NGS/USAF/code/VarDict-amplicon.v2.bed
+covBed	/NGS/USAF/code/VarDict-amplicon.v2.1.bed
