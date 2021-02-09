@@ -5,4 +5,5 @@
 .LSOverride
 
 ## Test
-test
+test/fastq
+test/.DS_Store
