@@ -8,7 +8,6 @@ fp=$(dirname "$1")
 fn=$(basename "$1")
 if [[ $3 -ne 0 ]];then
 	echo "simple contig count of split files not implement yet"
-	exit 1
 	#if [ ! -f "${1}-NT.coverage" ];then
 	#       samtools bedcov -Q 4 "$3" "${1}-good.bam" > "${1}-NT.coverage"
 	#       fi
@@ -61,7 +60,7 @@ if [[ $3 -ne 0 ]];then
 	##rm -f "${1}-good.bam" "${1}-IS.bam" "${1}-bad.bam" "${1}-cc.bam"
 	##rm -f "${1}-NT.coverage" "${1}-IS.coverage" "${1}-bad.coverage" "${1}-cc.coverage"
 elif [ ! -f "${1}.coverage" ];then
-	samtools view -q 8 -m 100 "${1}.bam" | awk -v filestr=$fn -v fo="$2" '{
+	samtools view -q 8 "${1}.bam" | awk -v filestr=$fn -v fo="$2" '{
 		if ($3 != $7 && $7 !~ /=/){
 	               rt++
 		} else if ($3 ~ /-SNAQ$/) {

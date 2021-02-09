@@ -14,9 +14,7 @@
 #  calcCov true or false generate coverage table to be used for viral load, otherwise use NT and IS read counts
 #  covBed </path/to/file> table used by samtools bedcov for coverage analysis, also doubles as a region filter
 ##
-## Program flow: read parameters; align reads; call remRecombinants; calculate coverage; create runQC table; calculate viral load
-## viral load calculated from total amplicon reads (NT + recombinants/2) / (IS + recombinant/2) * IS_INPUT
-##   Total recombinant amplicon reads should be half NT and half IS, hence the recombinant/2 contribution.
+## Program flow: read parameters; align reads; call remRecombinants; calculate coverage; create runQC table; calculate viral load (NT/IS*IS_input)
 ## runQC uses the NT and IS CC-reads to adjust expected complexity capture (cc_expected) for competition.  Unique CC sequences calculated from -CC-counts.txt
 ## Coverage calculated using bamstats amplicon counting method
 
